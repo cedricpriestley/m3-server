@@ -1,0 +1,21 @@
+{
+  "name": "m3server",
+  "version": "1.0.0",
+  "description": "Mean Meta Music Server",
+  "main": "server.js",
+  "scripts": {
+    "test": "m3server_test"
+  },
+  "author": "Cedric Priestley",
+  "license": "ISC",
+  "dependencies": {
+    "amazon-product-api": "^0.4.4",
+    "billboard-top-100": "^2.4.1",
+    "express": "^4.16.4",
+    "express-graphql": "^0.7.1",
+    "graphql": "^14.1.1",
+    "mongodb": "^3.1.13",
+    "mongoose": "^5.4.10",
+    "mysql": "^2.16.0"
+  }
+}
