@@ -6,7 +6,7 @@ const url = 'mongodb://localhost:27017';
 const dbName = 'MeanMetaMusic';
 const mbzDbName = "ngsdb";
 
-//importDatabase();
+importDatabase();
 
 function importDatabase() {
 
@@ -75,7 +75,7 @@ function processTable(tableName, callback) {
                     insertDocs.push(document);
                 }
                 if (action == 'update') {
-
+console.log(document);
                     updateDocs.push(document);
                 }
                 if ((results.length - 1) == index) {
@@ -185,7 +185,6 @@ function processRow(row, tableName, callback) {
                     $set: document
                 }]);
         } else {
-            //document = { _id: row.id, name: row.name, gid: row.gid };
             callback("insert", document);
         }
     });
