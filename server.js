@@ -97,16 +97,82 @@ app.route('/api/charts/list').get((req, res) => {
   });
 });
 
-app.route('/api/cats/:name').get((req, res) => {
-  const requestedCatName = req.params['name'];
-  res.send({ name: requestedCatName });
-});
-
 app.route('/api/artist/:id').get((req, res) => {
   const id = req.params['id'];
 
   getArtist(id, function (documents) {
-    getArtistCallback(id, documents);
+    if (documents && documents.length == 1) {
+      artist = documents[0];
+
+      if (artist.last_update) {
+        res.send(artist);
+      } else {
+        console.log(`${artist.name} is being imported`);
+        let mbid = artist.gid;
+        const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags+release-groups&fmt=json`;
+
+        var options = {
+          url: mburl,
+          headers: {
+            'User-Agent': 'm3 server 100.115.92.202'
+          },
+          json: true
+        };
+
+        request(options, (err, res2, artist) => {
+          if (err) { return console.log(err); }
+
+          //var genderEnum = new Enum(['A', 'B', 'C'], { name: 'MyEnum' });
+
+          let updateValues = {};
+
+          let disambiguation = artist.disambiguation;
+          if (disambiguation) {
+            updateValues['disambiguation'] = disambiguation;
+          }
+
+          let sortName = artist['sort-name'];
+          if (sortName) {
+            updateValues['sort_name'] = sortName;
+          }
+
+          let gender = artist.gender == 'Male' ? 'm' : (artist.gender == 'Female' ? 'f' : null);
+          if (gender) {
+            updateValues['gender'] = gender;
+          }
+
+          updateValues['last_update'] = new Date();
+
+          let document = [
+            { _id: parseInt(id) },
+            { $set: updateValues }];
+
+          updateArtist([document], (res) => {
+          });
+
+          //getArtist(id, function (documents) {
+          //getArtistCallback(documents);
+          //});
+
+          res.send(artist);
+        });
+      }
+    }
+  });
+});
+
+//app.route('/api/search/artist').get((req, res) => {
+//const term = req.params['term'];
+//res.send({ term: term });
+//});
+
+app.route('/api/search/artist/:term/:offset/:count').get((req, res) => {
+  const term = req.params['term'];
+  const offset = req.params['offset'];
+  const count = req.params['count'];
+
+  searchArtist(term, function (documents) {
+    res.send(documents);
   });
 });
 
@@ -152,9 +218,39 @@ function getArtist(id, callback) {
     const db = client.db(dbName);
 
     collection = db.collection("artist");
-    collection.find({ _id: parseInt(id) }).toArray(function (err, document) {
+    collection.find({ _id: parseInt(id) }).toArray(function (err, documents) {
       //assert.equal(err, null);
-      callback(document);
+      callback(documents);
+    });
+
+    client.close();
+  });
+}
+
+function searchArtist(term, callback) {
+
+  const MongoClient = require('mongodb').MongoClient;
+  const assert = require('assert');
+
+  // Connection URL
+  const url = 'mongodb://localhost:27017';
+
+  // Database Name
+  const dbName = 'm3db';
+
+  // Use connect method to connect to the server
+  MongoClient.connect(url, { useNewUrlParser: true }, function (err, client) {
+    assert.equal(null, err);
+    console.log("Connected successfully to server");
+
+    const db = client.db(dbName);
+
+    collection = db.collection("artist");
+    term = '"' + term + '"';
+    
+    collection.find({ $text: { $search: term, $caseSensitive: false } }).toArray(function (err, documents) {
+      //assert.equal(err, null);
+      callback(documents);
     });
 
     client.close();
@@ -181,7 +277,6 @@ function updateArtist(documents, callback) {
     const collection = db.collection(collectionName);
 
     documents.forEach(function (document) {
-      console.log(document);
       collection.updateOne(
         document[0], document[1]
         , function (err, result) {
@@ -191,64 +286,4 @@ function updateArtist(documents, callback) {
     });
     client.close();
   });
-}
-
-function getArtistCallback(documents) {
-  if (documents && documents.length == 1) {
-    artist = documents[0];
-
-    if (artist.last_update) {
-      res.send(artist);
-    } else {
-      console.log(`${artist.name} is being imported`);
-      let mbid = artist.gid;
-      const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags+release-groups&fmt=json`;
-
-      var options = {
-        url: mburl,
-        headers: {
-          'User-Agent': 'm3 server 100.115.92.202'
-        },
-        json: true
-      };
-
-      request(options, (err, res2, artist) => {
-        if (err) { return console.log(err); }
-
-        //var genderEnum = new Enum(['A', 'B', 'C'], { name: 'MyEnum' });
-
-        let updateValues = {};
-
-        let disambiguation = artist.disambiguation;
-        if (disambiguation) {
-          updateValues['disambiguation'] = disambiguation;
-        }
-
-        let sortName = artist['sort-name'];
-        if (sortName) {
-          updateValues['sort_name'] = sortName;
-        }
-
-        let gender = artist.gender == 'Male' ? 'm' : (artist.gender == 'Female' ? 'f' : null);
-        if (gender) {
-          updateValues['gender'] = gender;
-        }
-
-        updateValues['last_update'] = new Date();
-
-        let document = [
-          { _id: parseInt(id) },
-          { $set: updateValues }];
-
-        updateArtist([document], (res) => {
-        });
-
-        //getArtist(id, function (documents) {
-          //getArtistCallback(documents);
-        //});
-
-        res.send(artist);
-      });
-    }
-  }
 }
