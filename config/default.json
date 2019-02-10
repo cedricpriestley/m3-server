@@ -1,0 +1,8 @@
+{
+  "general": {
+    "import": {
+      "autoImport": false,
+      "useMbJson": false
+    }
+  }
+}

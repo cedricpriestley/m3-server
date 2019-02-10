@@ -7,10 +7,38 @@ const assert = require('assert');
 const request = require('request');
 const Enum = require('./enums');
 const config = require('config');
+const { getCode, getName } = require('country-list');
+const mongodbUrl = 'mongodb://localhost:27017';
+const mongodbName = 'm3db';
+var useMbJson = config.get('general.import.useMbJson');
+const slugify = require('slugify');
 
-app.use(function (req, res, next) {
+const artistFields = [
+  'name',
+  'sort-name',
+  'gender-id',
+  'gender',
+  'isnis',
+  'type',
+  'country',
+  'relations',
+  'disambiguation',
+  'end_area',
+  'type-id',
+  'type',
+  'area',
+  'life-span',
+  'aliases',
+  'tags',
+  'begin_area',
+  'last_updated',
+  'slug'
+];
+
+app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.header("Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
 
@@ -19,7 +47,7 @@ app.listen(8000, () => {
 });
 
 app.route('/api/charts/hot-100').get((req, res) => {
-  billboard.getChart('hot-100', '2019-01-26', function (err, chart) {
+  billboard.getChart('hot-100', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
       res.send({ 'error': err });
@@ -29,8 +57,7 @@ app.route('/api/charts/hot-100').get((req, res) => {
 });
 
 app.route('/api/charts/r-b-hip-hop-songs').get((req, res) => {
-
-  billboard.getChart('r-b-hip-hop-songs', '2019-01-26', function (err, chart) {
+  billboard.getChart('r-b-hip-hop-songs', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
       res.send({ 'error': err });
@@ -40,8 +67,7 @@ app.route('/api/charts/r-b-hip-hop-songs').get((req, res) => {
 });
 
 app.route('/api/charts/billboard-200').get((req, res) => {
-
-  billboard.getChart('billboard-200', '2019-01-26', function (err, chart) {
+  billboard.getChart('billboard-200', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
       res.send({ 'error': err });
@@ -51,10 +77,7 @@ app.route('/api/charts/billboard-200').get((req, res) => {
 });
 
 app.route('/api/charts/artist-100').get((req, res) => {
-
-  // date format YYYY-MM-DD
-
-  billboard.getChart('artist-100', '2019-01-26', function (err, chart) {
+  billboard.getChart('artist-100', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
       res.send({ 'error': err });
@@ -66,21 +89,19 @@ app.route('/api/charts/artist-100').get((req, res) => {
 app.route('/api/charts/list').get((req, res) => {
   var listCharts = require('billboard-top-100').listCharts;
 
-  listCharts(function (err, charts) {
+  listCharts((err, charts) => {
     if (err) {
       console.log(err);
       res.send({});
     }
-    console.log(charts); // prints array of all charts
+    console.log(charts);
   });
 });
 
-
-app.route('/api/artist/reset/:gid').get((req, res) => {
-  const gid = req.params['gid'];
-  console.log('hello');
-  resetArtist(gid, () => {
-    getArtist(gid, (documents) => {
+app.route('/api/artist/reset/:id').get((req, res) => {
+  const id = req.params['id'];
+  resetArtist(id, () => {
+    getArtist(id, (documents) => {
       if (documents && documents.length == 1) {
         artist = documents[0];
         res.send(artist);
@@ -89,28 +110,28 @@ app.route('/api/artist/reset/:gid').get((req, res) => {
   });
 });
 
-app.route('/api/artist/import/:gid').get((req, res) => {
-  const gid = req.params['gid'];
-  getArtist(gid, function (documents) {
+app.route('/api/artist/import/:id').get((req, res) => {
+  const id = req.params['id'];
+  getArtist(id, (documents) => {
     if (documents && documents.length == 1) {
       artist = documents[0];
 
-      importArtist(artist.gid, artist.name, (importedArtist) => {
+      importArtist(artist.id, artist.name, (importedArtist) => {
         res.send(importedArtist);
       });
     }
   });
 });
 
-app.route('/api/artist/:gid').get((req, res) => {
-  const gid = req.params['gid'];
-  getArtist(gid, function (documents) {
+app.route('/api/artist/:id').get((req, res) => {
+  const id = req.params['id'];
+  getArtist(id, (documents) => {
     if (documents && documents.length == 1) {
       artist = documents[0];
 
       let autoImport = config.get('general.import.autoImport');
       if (autoImport) {
-        importArtist(artist.gid, artist.name, (importedArtist) => {
+        importArtist(artist.id, artist.name, (importedArtist) => {
           res.send(importedArtist);
         });
       } else {
@@ -120,10 +141,9 @@ app.route('/api/artist/:gid').get((req, res) => {
   });
 });
 
-
-function importArtist(gid, name, callback) {
+var importArtist = (id, name, callback) => {
   console.log(`${name} is being imported`);
-  let mbid = gid;
+  let mbid = id;
   const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags+release-groups&fmt=json`;
 
   var options = {
@@ -139,58 +159,57 @@ function importArtist(gid, name, callback) {
 
     let updateValues = {};
 
-    let disambiguation = artist.disambiguation;
-    if (disambiguation) {
-      updateValues['disambiguation'] = disambiguation;
-    }
-
-    let sortName = artist['sort-name'];
-    if (sortName) {
-      updateValues['sort_name'] = sortName;
-    }
-
-    if (artist['gender-id']) {
-      updateValues['gender'] = Enum.Gender.get(artist['gender-id']).value;
-    }
-
-    if (artist['type-id']) {
-      updateValues['type'] = Enum.ArtistType.get(artist['type-id']).value;
-    }
-
-    updateValues['tags'] = [];
-    artist.tags.forEach((tag) => {
-      if (tag.count > 0) {
-        updateValues['tags'].push(tag.name);
+    artistFields.forEach((field) => {
+      if (field != 'tags' || field != 'slug') {
+        if (eval("artist['" + field + "']")) {
+          updateValues[field] = eval("artist['" + field + "']");
+        }
       }
     });
 
-    updateValues['last_update'] = new Date();
+    if (artist.tags) {
+      updateValues['tags'] = [];
+      artist.tags.forEach((tag) => {
+        if (tag.count > 0) {
+          updateValues['tags'].push({ name: tag.name, count: tag.count });
+        }
+      });
+    }
+
+    // remove *+~.()'"!:@/\ from slug
+    let slug = artist.name + ((artist.disambiguation)
+      ? '-' + (artist.disambiguation) : '').replace(/\//g, '-');
+
+    updateValues['slug'] =
+    slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
+
+    updateValues['last_updated'] = new Date();
 
     let document = [
-      { gid: mbid },
+      { id: mbid },
       { $set: updateValues }];
 
     updateArtists([document], (result) => {
-      getArtist(mbid, (documents) => {
-        if (documents && documents.length == 1) {
-          artist = documents[0];
-          callback(artist);
-        }
-      })
+      if (useMbJson) {
+        callback(artist);
+      } else {
+        getArtist(mbid, (documents) => {
+          if (documents && documents.length == 1) {
+            artist = documents[0];
+            callback(artist);
+          }
+        });
+      }
     });
   });
 }
-//app.route('/api/search/artist').get((req, res) => {
-//const term = req.params['term'];
-//res.send({ term: term });
-//});
 
 app.route('/api/search/artist/:term/:offset/:count').get((req, res) => {
   const term = req.params['term'];
   const offset = req.params['offset'];
   const count = req.params['count'];
 
-  searchArtist(term, function (documents) {
+  searchArtist(term, (documents) => {
     res.send(documents);
   });
 });
@@ -209,35 +228,27 @@ app.route('/api/amazon/:asin').get((req, res) => {
     idType: "ASIN",
     itemId: asin,
     responseGroup: 'Large'
-  }).then(function (results) {
+  }).then((results) => {
     //console.log(results);
     res.send(JSON.stringify(results));
-  }).catch(function (err) {
+  }).catch((err) => {
     //console.log(err);
     res.send(JSON.stringify(err));
   });
 });
 
-function getArtist(gid, callback) {
+var getArtist = (id, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
-  const assert = require('assert');
 
-  // Connection URL
-  const url = 'mongodb://localhost:27017';
-
-  // Database Name
-  const dbName = 'm3db';
-
-  // Use connect method to connect to the server
-  MongoClient.connect(url, { useNewUrlParser: true }, function (err, client) {
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
-    const db = client.db(dbName);
+    const db = client.db(mongodbName);
 
     collection = db.collection("artist");
-    collection.find({ gid: gid }).toArray(function (err, documents) {
+    collection.find({ id: id }).toArray((err, documents) => {
       //assert.equal(err, null);
       callback(documents);
     });
@@ -246,28 +257,22 @@ function getArtist(gid, callback) {
   });
 }
 
-function searchArtist(term, callback) {
+var searchArtist = (term, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
-  const assert = require('assert');
 
-  // Connection URL
-  const url = 'mongodb://localhost:27017';
-
-  // Database Name
-  const dbName = 'm3db';
-
-  // Use connect method to connect to the server
-  MongoClient.connect(url, { useNewUrlParser: true }, function (err, client) {
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
-    const db = client.db(dbName);
+    const db = client.db(mongodbName);
 
     collection = db.collection("artist");
     term = '"' + term + '"';
 
-    collection.find({ $text: { $search: term, $caseSensitive: false } }).toArray(function (err, documents) {
+    collection.find({
+      $text: { $search: term, $caseSensitive: false }
+    }).toArray((err, documents) => {
       //assert.equal(err, null);
       callback(documents);
     });
@@ -276,30 +281,21 @@ function searchArtist(term, callback) {
   });
 }
 
-function updateArtists(documents, callback) {
+var updateArtists = (documents, callback) => {
   if (documents.length == 0) return;
 
   const MongoClient = require('mongodb').MongoClient;
-  const assert = require('assert');
 
-  // Connection URL
-  const url = 'mongodb://localhost:27017';
-
-  // Database Name
-  const dbName = 'm3db';
-  const collectionName = 'artist';
-
-  MongoClient.connect(url, { useNewUrlParser: true }, function (err, client) {
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
 
-    const db = client.db('m3db');
-    const collection = db.collection(collectionName);
+    const db = client.db(mongodbName);
+    const collection = db.collection('artist');
 
-    documents.forEach(function (document) {
+    documents.forEach((document) => {
       collection.updateOne(
         document[0], document[1]
-        , function (err, result) {
-          //console.log(`Updated ${documents.length} documents in the collection`);
+        , (err, result) => {
           callback(result);
         });
     });
@@ -307,39 +303,36 @@ function updateArtists(documents, callback) {
   });
 }
 
-function resetArtist(gid, callback) {
+var resetArtist = (id, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
-  const assert = require('assert');
 
-  // Connection URL
-  const url = 'mongodb://localhost:27017';
-
-  // Database Name
-  const dbName = 'm3db';
-  const collectionName = 'artist';
-
-  MongoClient.connect(url, { useNewUrlParser: true }, function (err, client) {
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
 
-    const db = client.db('m3db');
-    const collection = db.collection(collectionName);
+    const db = client.db(mongodbName);
+    const collection = db.collection('artist');
+
+    let unsetValues = {};
+    artistFields.forEach((field) => {
+      //if (field != 'slug') {
+      unsetValues[field] = '';
+      //}
+    });
 
     collection.updateOne(
-      { gid: gid },
+      { id: id },
       {
-        $unset: {
-          last_update: '',
-          tags: '',
-          gender: '',
-          sort_name: '',
-          type: ''
-        }
+        $unset:
+          unsetValues
       }
-      , function (err, result) {
-        //console.log(`Resetted ${documents.length} documents in the collection`);
+      , (err, result) => {
         callback();
       });
     client.close();
   });
+}
+
+function removeLastComma(str) {
+  return str.replace(/,(\s+)?$/, '');
 }
