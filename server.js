@@ -36,6 +36,7 @@ const artistFields = [
 ];
 
 app.use((req, res, next) => {
+  //console.log('made it here 1');
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept");
@@ -44,6 +45,107 @@ app.use((req, res, next) => {
 
 app.listen(8000, () => {
   console.log('Server started!');
+});
+
+app.route('/api/artist/browse/:offset/:count').get((req, res) => {
+  const offset = req.params['offset'];
+  const count = req.params['count'];
+
+  browseArtists(offset, count, (documents) => {
+    if (documents && documents.length >= 0) {
+      res.send(documents);
+    }
+  });
+});
+
+app.route('/api/artist/count').get((req, res) => {
+  if (app.get('artistCount')) {
+    let count = app.get('artistCount');
+    res.send([{ count }]);
+  } else {
+    getArtistCount((count) => {
+      //if (typeof count == Number) {
+      app.set('artistCount', count);
+      res.send([{ count }]);
+      // }
+    });
+  }
+});
+
+app.route('/api/artist/reset/:id').get((req, res) => {
+  const id = req.params['id'];
+  resetArtist(id, () => {
+    getArtist(id, (documents) => {
+      if (documents && documents.length == 1) {
+        artist = documents[0];
+        res.send(artist);
+      }
+    });
+  });
+});
+
+app.route('/api/artist/import/:id').get((req, res) => {
+  const id = req.params['id'];
+  getArtist(id, (documents) => {
+    if (documents && documents.length == 1) {
+      artist = documents[0];
+
+      importArtist(artist.id, artist.name, (importedArtist) => {
+        res.send(importedArtist);
+      });
+    }
+  });
+});
+
+app.route('/api/artist/search/:term/:offset/:count').get((req, res) => {
+  const term = req.params['term'];
+  const offset = req.params['offset'];
+  const count = req.params['count'];
+
+  searchArtist(term, offset, count, (documents) => {
+    res.send(documents);
+  });
+});
+
+app.route('/api/artist/:id').get((req, res) => {
+  const id = req.params['id'];
+  getArtist(id, (documents) => {
+    if (documents && documents.length == 1) {
+      artist = documents[0];
+
+      let autoImport = config.get('general.import.autoImport');
+      if (autoImport) {
+        importArtist(artist.id, artist.name, (importedArtist) => {
+          res.send(importedArtist);
+        });
+      } else {
+        res.send(artist);
+      }
+    }
+  });
+});
+
+app.route('/api/amazon/:asin').get((req, res) => {
+  var asin = req.param['asin'];
+  asin = "B0000029GA";
+  //console.log(asin);
+  var client = amazon.createClient({
+    awsId: "AKIAJ2GKAP6QL6J4UISQ",
+    awsSecret: "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",
+    awsTag: "hakdras-20"
+  });
+
+  client.itemLookup({
+    idType: "ASIN",
+    itemId: asin,
+    responseGroup: 'Large'
+  }).then((results) => {
+    //console.log(results);
+    res.send(JSON.stringify(results));
+  }).catch((err) => {
+    //console.log(err);
+    res.send(JSON.stringify(err));
+  });
 });
 
 app.route('/api/charts/hot-100').get((req, res) => {
@@ -98,53 +200,10 @@ app.route('/api/charts/list').get((req, res) => {
   });
 });
 
-app.route('/api/artist/reset/:id').get((req, res) => {
-  const id = req.params['id'];
-  resetArtist(id, () => {
-    getArtist(id, (documents) => {
-      if (documents && documents.length == 1) {
-        artist = documents[0];
-        res.send(artist);
-      }
-    });
-  });
-});
-
-app.route('/api/artist/import/:id').get((req, res) => {
-  const id = req.params['id'];
-  getArtist(id, (documents) => {
-    if (documents && documents.length == 1) {
-      artist = documents[0];
-
-      importArtist(artist.id, artist.name, (importedArtist) => {
-        res.send(importedArtist);
-      });
-    }
-  });
-});
-
-app.route('/api/artist/:id').get((req, res) => {
-  const id = req.params['id'];
-  getArtist(id, (documents) => {
-    if (documents && documents.length == 1) {
-      artist = documents[0];
-
-      let autoImport = config.get('general.import.autoImport');
-      if (autoImport) {
-        importArtist(artist.id, artist.name, (importedArtist) => {
-          res.send(importedArtist);
-        });
-      } else {
-        res.send(artist);
-      }
-    }
-  });
-});
-
 var importArtist = (id, name, callback) => {
   console.log(`${name} is being imported`);
   let mbid = id;
-  const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags+release-groups&fmt=json`;
+  const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags&fmt=json`;
 
   var options = {
     url: mburl,
@@ -181,7 +240,7 @@ var importArtist = (id, name, callback) => {
       ? '-' + (artist.disambiguation) : '').replace(/\//g, '-');
 
     updateValues['slug'] =
-    slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
+      slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
 
     updateValues['last_updated'] = new Date();
 
@@ -204,39 +263,6 @@ var importArtist = (id, name, callback) => {
   });
 }
 
-app.route('/api/search/artist/:term/:offset/:count').get((req, res) => {
-  const term = req.params['term'];
-  const offset = req.params['offset'];
-  const count = req.params['count'];
-
-  searchArtist(term, (documents) => {
-    res.send(documents);
-  });
-});
-
-app.route('/api/amazon/:asin').get((req, res) => {
-  var asin = req.param['asin'];
-  asin = "B0000029GA";
-  //console.log(asin);
-  var client = amazon.createClient({
-    awsId: "AKIAJ2GKAP6QL6J4UISQ",
-    awsSecret: "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",
-    awsTag: "hakdras-20"
-  });
-
-  client.itemLookup({
-    idType: "ASIN",
-    itemId: asin,
-    responseGroup: 'Large'
-  }).then((results) => {
-    //console.log(results);
-    res.send(JSON.stringify(results));
-  }).catch((err) => {
-    //console.log(err);
-    res.send(JSON.stringify(err));
-  });
-});
-
 var getArtist = (id, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
@@ -252,6 +278,46 @@ var getArtist = (id, callback) => {
       //assert.equal(err, null);
       callback(documents);
     });
+
+    client.close();
+  });
+}
+
+var getArtistCount = (callback) => {
+  const MongoClient = require('mongodb').MongoClient;
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
+    assert.equal(null, err);
+    console.log("Connected successfully to server");
+
+    const db = client.db(mongodbName);
+
+    collection = db.collection("artist");
+    collection.countDocuments((err, count) => {
+      //assert.equal(err, null);
+      callback(count);
+    });
+
+    client.close();
+  });
+}
+
+var browseArtists = (offset, count, callback) => {
+  const MongoClient = require('mongodb').MongoClient;
+
+  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
+    assert.equal(null, err);
+    console.log("Connected successfully to server");
+
+    const db = client.db(mongodbName);
+
+    collection = db.collection("artist");
+    collection.find({ "name": { $ne: null } })
+      .limit(parseInt(count))
+      .skip(parseInt(offset))
+      .sort({ name: 1 }).toArray((err, documents) => {
+        //assert.equal(err, null);
+        callback(documents);
+      });
 
     client.close();
   });
@@ -322,10 +388,7 @@ var resetArtist = (id, callback) => {
 
     collection.updateOne(
       { id: id },
-      {
-        $unset:
-          unsetValues
-      }
+      { $unset: unsetValues }
       , (err, result) => {
         callback();
       });
