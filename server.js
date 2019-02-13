@@ -13,30 +13,7 @@ const mongodbName = 'm3db';
 var useMbJson = config.get('general.import.useMbJson');
 const slugify = require('slugify');
 
-const artistFields = [
-  'name',
-  'sort-name',
-  'gender-id',
-  'gender',
-  'isnis',
-  'type',
-  'country',
-  'relations',
-  'disambiguation',
-  'end_area',
-  'type-id',
-  'type',
-  'area',
-  'life-span',
-  'aliases',
-  'tags',
-  'begin_area',
-  'last_updated',
-  'slug'
-];
-
 app.use((req, res, next) => {
-  //console.log('made it here 1');
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept");
@@ -48,6 +25,7 @@ app.listen(8000, () => {
 });
 
 app.route('/api/artist/browse/:offset/:count').get((req, res) => {
+  console.log('/api/artist/browse/:offset/:count');
   const offset = req.params['offset'];
   const count = req.params['count'];
 
@@ -58,40 +36,46 @@ app.route('/api/artist/browse/:offset/:count').get((req, res) => {
   });
 });
 
-app.route('/api/artist/count').get((req, res) => {
-  if (app.get('artistCount')) {
-    let count = app.get('artistCount');
+app.route('/api/:type/count').get((req, res) => {
+  const type = req.params['type'];
+  console.log('/api/:type/count', type);
+  if (app.get('${type}Count')) {
+    let count = app.get('${type}Count');
     res.send([{ count }]);
   } else {
-    getArtistCount((count) => {
+    getEntityCount(type, (count) => {
       //if (typeof count == Number) {
-      app.set('artistCount', count);
+      app.set('${type}Count', count);
       res.send([{ count }]);
       // }
     });
   }
 });
 
-app.route('/api/artist/reset/:id').get((req, res) => {
+app.route('/api/:type/reset/:id').get((req, res) => {
   const id = req.params['id'];
-  resetArtist(id, () => {
-    getArtist(id, (documents) => {
+  const type = req.params['type'];
+  console.log('/api/:type/reset/:id', id, type);
+  resetEntity(id, type, () => {
+    getEntity(id, type, (documents) => {
       if (documents && documents.length == 1) {
-        artist = documents[0];
-        res.send(artist);
+        entity = documents[0];
+        res.send(entity);
       }
     });
   });
 });
 
-app.route('/api/artist/import/:id').get((req, res) => {
+app.route('/api/:type/import/:id').get((req, res) => {
   const id = req.params['id'];
-  getArtist(id, (documents) => {
+  const type = req.params['type'];
+  console.log('/api/:type/import/:id', id, type);
+  getEntity(id, type, (documents) => {
     if (documents && documents.length == 1) {
-      artist = documents[0];
+      entity = documents[0];
 
-      importArtist(artist.id, artist.name, (importedArtist) => {
-        res.send(importedArtist);
+      importEntity(entity.id, type, entity.name, (importedEntity) => {
+        res.send(importedEntity);
       });
     }
   });
@@ -101,25 +85,27 @@ app.route('/api/artist/search/:term/:offset/:count').get((req, res) => {
   const term = req.params['term'];
   const offset = req.params['offset'];
   const count = req.params['count'];
-
+  console.log('/api/artist/search/:term/:offset/:count', term, offset, count);
   searchArtist(term, offset, count, (documents) => {
     res.send(documents);
   });
 });
 
-app.route('/api/artist/:id').get((req, res) => {
+app.route('/api/:type/:id').get((req, res) => {
   const id = req.params['id'];
-  getArtist(id, (documents) => {
+  const type = req.params['type'];
+  console.log('/api/:type/:id', id, type);
+  getEntity(id, type, (documents) => {
     if (documents && documents.length == 1) {
-      artist = documents[0];
+      entity = documents[0];
 
       let autoImport = config.get('general.import.autoImport');
       if (autoImport) {
-        importArtist(artist.id, artist.name, (importedArtist) => {
-          res.send(importedArtist);
+        importEntity(entity.id, type, entity.name, (importedEntity) => {
+          res.send(importedEntity);
         });
       } else {
-        res.send(artist);
+        res.send(entity);
       }
     }
   });
@@ -128,7 +114,7 @@ app.route('/api/artist/:id').get((req, res) => {
 app.route('/api/amazon/:asin').get((req, res) => {
   var asin = req.param['asin'];
   asin = "B0000029GA";
-  //console.log(asin);
+  console.log('/api/amazon/:asin', asin);
   var client = amazon.createClient({
     awsId: "AKIAJ2GKAP6QL6J4UISQ",
     awsSecret: "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",
@@ -140,15 +126,14 @@ app.route('/api/amazon/:asin').get((req, res) => {
     itemId: asin,
     responseGroup: 'Large'
   }).then((results) => {
-    //console.log(results);
     res.send(JSON.stringify(results));
   }).catch((err) => {
-    //console.log(err);
     res.send(JSON.stringify(err));
   });
 });
 
 app.route('/api/charts/hot-100').get((req, res) => {
+  console.log('/api/charts/hot-100');
   billboard.getChart('hot-100', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
@@ -159,6 +144,7 @@ app.route('/api/charts/hot-100').get((req, res) => {
 });
 
 app.route('/api/charts/r-b-hip-hop-songs').get((req, res) => {
+  console.log('/api/charts/r-b-hip-hop-songs');
   billboard.getChart('r-b-hip-hop-songs', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
@@ -169,6 +155,7 @@ app.route('/api/charts/r-b-hip-hop-songs').get((req, res) => {
 });
 
 app.route('/api/charts/billboard-200').get((req, res) => {
+  console.log('/api/charts/billboard-200');
   billboard.getChart('billboard-200', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
@@ -179,6 +166,7 @@ app.route('/api/charts/billboard-200').get((req, res) => {
 });
 
 app.route('/api/charts/artist-100').get((req, res) => {
+  console.log('/api/charts/artist-100');
   billboard.getChart('artist-100', '2019-01-26', (err, chart) => {
     if (err) {
       console.log(err);
@@ -189,6 +177,7 @@ app.route('/api/charts/artist-100').get((req, res) => {
 });
 
 app.route('/api/charts/list').get((req, res) => {
+  console.log('/api/charts/list');
   var listCharts = require('billboard-top-100').listCharts;
 
   listCharts((err, charts) => {
@@ -200,11 +189,12 @@ app.route('/api/charts/list').get((req, res) => {
   });
 });
 
-var importArtist = (id, name, callback) => {
+var importEntity = (id, type, name, callback) => {
   console.log(`${name} is being imported`);
   let mbid = id;
-  const mburl = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=aliases+tags+artist-rels+label-rels+url-rels+tags&fmt=json`;
-
+  let incs = getEntityIncludes(type).join("+");
+  const mburl = `https://musicbrainz.org/ws/2/${type}/${mbid}?inc=${incs}&fmt=json`;
+  console.log(mburl);
   var options = {
     url: mburl,
     headers: {
@@ -213,31 +203,40 @@ var importArtist = (id, name, callback) => {
     json: true
   };
 
-  request(options, (err, res2, artist) => {
+  request(options, (err, res2, entity) => {
     if (err) { return console.log(err); }
 
     let updateValues = {};
-
-    artistFields.forEach((field) => {
-      if (field != 'tags' || field != 'slug') {
-        if (eval("artist['" + field + "']")) {
-          updateValues[field] = eval("artist['" + field + "']");
+    let entityFields = getEntityFields(type);
+    entityFields.forEach((field) => {
+      if (field != 'slug') {
+        if (eval("entity['" + field + "']")) {
+          updateValues[field] = eval("entity['" + field + "']");
         }
       }
     });
 
-    if (artist.tags) {
+    if (entity.tags && entity.tags.length > 0) {
       updateValues['tags'] = [];
-      artist.tags.forEach((tag) => {
-        if (tag.count > 0) {
-          updateValues['tags'].push({ name: tag.name, count: tag.count });
-        }
+      entity.tags.forEach((tag) => {
+        // if (tag.count > 0) {
+        updateValues['tags'].push(tag);//updateValues['tags'].push({ name: tag.name, count: tag.count });
+        //}
+      });
+    }
+
+    if (entity.aliases && entity.aliases.length > 0) {
+      updateValues['aliases'] = [];
+      entity.aliases.forEach((alias) => {
+        //if (alias.count > 0) {
+        updateValues['aliases'].push(alias);//updateValues['aliases'].push({ name: alias.name, count: alias.count });
+        //}
       });
     }
 
     // remove *+~.()'"!:@/\ from slug
-    let slug = artist.name + ((artist.disambiguation)
-      ? '-' + (artist.disambiguation) : '').replace(/\//g, '-');
+    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation)
+      ? '-' + (entity.disambiguation) : '').replace(/\//g, '-');
 
     updateValues['slug'] =
       slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
@@ -248,14 +247,14 @@ var importArtist = (id, name, callback) => {
       { id: mbid },
       { $set: updateValues }];
 
-    updateArtists([document], (result) => {
+    updateEntities(type, [document], (result) => {
       if (useMbJson) {
-        callback(artist);
+        callback(entity);
       } else {
-        getArtist(mbid, (documents) => {
+        getEntity(mbid, type, (documents) => {
           if (documents && documents.length == 1) {
-            artist = documents[0];
-            callback(artist);
+            entity = documents[0];
+            callback(entity);
           }
         });
       }
@@ -263,7 +262,7 @@ var importArtist = (id, name, callback) => {
   });
 }
 
-var getArtist = (id, callback) => {
+var getEntity = (id, type, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
 
@@ -272,8 +271,8 @@ var getArtist = (id, callback) => {
     console.log("Connected successfully to server");
 
     const db = client.db(mongodbName);
-
-    collection = db.collection("artist");
+    const entityType = type.replace('-', '_');
+    collection = db.collection(entityType);
     collection.find({ id: id }).toArray((err, documents) => {
       //assert.equal(err, null);
       callback(documents);
@@ -283,7 +282,7 @@ var getArtist = (id, callback) => {
   });
 }
 
-var getArtistCount = (callback) => {
+var getEntityCount = (callback) => {
   const MongoClient = require('mongodb').MongoClient;
   MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
@@ -347,7 +346,7 @@ var searchArtist = (term, callback) => {
   });
 }
 
-var updateArtists = (documents, callback) => {
+var updateEntities = (type, documents, callback) => {
   if (documents.length == 0) return;
 
   const MongoClient = require('mongodb').MongoClient;
@@ -356,7 +355,8 @@ var updateArtists = (documents, callback) => {
     assert.equal(null, err);
 
     const db = client.db(mongodbName);
-    const collection = db.collection('artist');
+    const entityType = type.replace('-', '_');
+    const collection = db.collection(entityType);
 
     documents.forEach((document) => {
       collection.updateOne(
@@ -369,18 +369,20 @@ var updateArtists = (documents, callback) => {
   });
 }
 
-var resetArtist = (id, callback) => {
+var resetEntity = (id, type, callback) => {
 
   const MongoClient = require('mongodb').MongoClient;
 
   MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
     assert.equal(null, err);
 
+    const entityType = type.replace('-', '_');
     const db = client.db(mongodbName);
-    const collection = db.collection('artist');
+    const collection = db.collection(entityType);
 
     let unsetValues = {};
-    artistFields.forEach((field) => {
+    let entityFields = getEntityFields(type);
+    entityFields.forEach((field) => {
       //if (field != 'slug') {
       unsetValues[field] = '';
       //}
@@ -396,6 +398,45 @@ var resetArtist = (id, callback) => {
   });
 }
 
-function removeLastComma(str) {
+const getEntityFields = type => {
+
+  switch (type) {
+    case "area":
+      return [
+        "aliases", "disambiguation", "last_updated", "life-span", "name",
+        "ratings", "relations", "slug", "sort-name", "tags", "type", "type-id"];
+      break;
+    case "artist":
+      return [
+        "aliases", "area", "begin_area", "country", "disambiguation",
+        "end_area", "gender", "gender-id", "isnis", "last_updated",
+        "life-span", "name", "ratings", "relations", "slug", "sort-name",
+        "tags", "type", "type-id"];
+      break;
+    case "release-group":
+      return [
+        "aliases", "disambiguation", "last_updated", "primary-type",
+        "primary-type-id", "ratings", "relations", "secondary-type-ids",
+        "secondary-types", "secondary-types", "slug", "tags", "title"];
+    default:
+      break;
+  }
+}
+
+const getEntityIncludes = type => {
+
+  switch (type) {
+    case "area":
+      return ["aliases", "area-rels", "artist-rels", "event-rels", "genres", "label-rels", "place-rels", "ratings", "release-group-rels", "release-rels", "series-rels", "tags", "url-rels", "work-rels"];
+    case "artist":
+    case "release-group":
+    case "release":
+      return ["aliases", "area-rels", "artist-rels", "event-rels", "genres", "label-rels", "place-rels", "ratings", "recording-rels", "release-group-rels", "release-rels", "series-rels", "tags", "url-rels", "work-rels"];
+    default:
+      break;
+  }
+}
+
+const removeLastComma = str => {
   return str.replace(/,(\s+)?$/, '');
 }
