@@ -6,10 +6,10 @@ const slugify = require('slugify');
 const Enum = require('../sandbox/enums');
 const config = require('config');
 const util = require('util');
+var Promise = require("bluebird");
 //const async = require('async');
 const request = util.promisify(require("request"));
 //const request = require('request-promise');
-//const request = require("request");
 const assert = require('assert');
 const Schema = mongoose.Schema;
 
@@ -106,14 +106,6 @@ exports.getEntityCount = (req, res, next) => {
   }
 };
 
-/*
-memberSchema.statics.findMax = function (callback) {
-
-  this.findOne({ country_id: 10 }) // 'this' now refers to the Member class
-    .sort('-score')
-    .exec(callback);
-}
-*/
 var _getNextId = (type, callback) => {
 
   entitySchema.options.collection = type.replace('-', '_');
@@ -129,90 +121,85 @@ var _getNextId = (type, callback) => {
     });
 }
 
-var _updateLastFMArtist = (id, type, callback) => {
-
-  similarArtists = [];
-
-  addSimilarArtist = artist => {
-    similarArtists.push(artist);
-  }
-
-  var options = _buildLastFMLookupUrl(id, type);
+var _updateLastFMArtist = (id) => {
+  var options = _buildLastFMLookupUrl(id, 'artist');
 
   request(options)
     .then(results => {
-      let document = {};
-      let artist = results['body']['artist'];
-      for (const key in artist) {
-        switch (key) {
-          case 'image':
+      if (results['body']['error']) {
+        console.log(results['body']['message']);
+      }
+      if (results['body']['artist']) {
+        let document = {};
+        let artist = results['body']['artist'];
+        for (const image of artist['image']) {
+          if (image['size'] === 'mega') {
+            document['image_url'] = image['#text'];
+          }
+        }
+
+        let similarArtists = [];
+        document['similar_artists'] = [];
+        for (artist of artist['similar']['artist']) {
+          similarArtists.push(artist['name']);
+        }
+
+        Promise.try(function () {
+          //similarArtists = ['nas', 'mobb deep', 'AZ', 'Foxy Brown', 'Raekwon'];
+          return _searchLastFMArtist(similarArtists);
+        }).then(function (results) {
+          // Now `results` is an array that contains the response for each HTTP request made.
+          //console.log(results);
+          for (const artist of results) {
+            let name = artist['name'];
+            let mbid = artist['mbid'];
+            let imageUrl = '';
             for (const image of artist['image']) {
               if (image['size'] === 'mega') {
-                document['image'] = image['#text'];
+                imageUrl = image['#text'];
               }
             }
-            break;
-          case 'similar':
+            document['similar_artists'].push({
+              name: name,
+              image_url: imageUrl,
+              mbid: mbid
+            });
+          }
+          //document['last_updated'] = new Date();
 
-            for (const similar_artist of artist['similar']['artist']) {
+          entitySchema.options.collection = 'artist';
 
-              let imageUrl = '';
-              let mbid = '';
-              let name = similar_artist['name'];
-
-              if (similar_artist['image']) {
-                for (const image of similar_artist['image']) {
-                  if (image['size'] === 'mega') {
-                    imageUrl = image['#text']
-                  }
-                }
-              }
-
-              //_searchLastFMArtist(similar_artist['name'], 'artist')
-              var options = _buildLastFMSearchUrl(name, type);
-              request(options)
-                .then(results => {
-                  if (results['body'] && results['body']['artist']) {
-                    let mbid = results['body']['artist']['mbid'];
-                    addSimilarArtist({
-                      id: mbid,
-                      name: name,
-                      image: imageUrl
-                    });
-                    //document['similar_artists'] = similarArtists;
-                    document['similar_artists'] = {
-                      id: mbid,
-                      name: name,
-                      image: imageUrl
-                    };
-                    //document['last_updated'] = new Date();
-                    _getEntityModel(type, document)
-                      .updateOne({ id: id }, document)
-                      .then(result => {
-                        callback(result);
-                      })
-                      .catch(err => {
-                        console.log(err);
-                        callback(err);
-                      });
-                  }
-                })
+          entitySchema.add({
+            image_url: {
+              type: String,
+              required: false
             }
-            break;
-          default:
-            break;
-        }
+          }
+          );
+          entitySchema.add({
+            similar_artists: {
+              type: [],
+              required: false
+            }
+          }
+          );
+          Entity = mongoose.model('artist', entitySchema);
+          Entity.updateOne({ id: id }, document)
+            //document
+            //.save()
+            .then(result => {
+              console.log(result);
+            })
+            .catch(err => {
+              console.log(err);
+            });
+        })
       }
-      return true;
-    })
-    .then(results => {
     })
     .catch(err => {
-      if (err) {
-        callback(err);
-      }
+      console.log(err);
     });
-}
+};
 
 var _getEntity = (id, type, callback) => {
   entitySchema.options.collection = type.replace('-', '_');
@@ -221,10 +208,10 @@ var _getEntity = (id, type, callback) => {
     .then(entity => {
       if (!entity) {
         _insertEntity(id, type, result => {
-          _getEntity(id, type, result => {
+          _getEntity(id, type, entity => {
             switch (type) {
               case 'artist':
-                _updateLastFMArtist(id, type, result => {
+                _updateLastFMArtist(id, result => {
                 });
               case 'release':
                 break;
@@ -236,27 +223,39 @@ var _getEntity = (id, type, callback) => {
       }
       callback(entity);
     })
-    .catch(err => console.log(err));
+    .catch(err => {
+      console.log(err)
+    });
 }
 
-var _searchLastFMArtist = (name, type, callback) => {
-  // var options = _buildLastFMSearchUrl(name, type);
-  // request(options, (err, res, entity) => {
-  //   if (err) {
-  //     console.log(name, err);
-  //     callback(null);
-  //   }
-  //   if ((entity &&
-  //     entity['error']
-  //     && entity['message'])
-  //     && !entity['artist']) {
-  //     console.log(name, entity['message']);
-  //     callback(null);
-  //   }
-
-  //   callback(entity['artist']['mbid']);
-  // });
-};
+var _searchLastFMArtist = (similarArtists) => {
+  return Promise.try(function () {
+    //similarArtists.reverse();
+    let name = similarArtists[similarArtists.length - 1];
+    let options = _buildLastFMSearchUrl(name, 'artist');
+    return request(options);
+  }).then(function (response) {
+    similarArtists.pop();
+    if (similarArtists.length > 0) {
+      return Promise.try(function () {
+        return _searchLastFMArtist(similarArtists);
+      }).then(function (recursiveResults) {
+        if (response.body.artist.mbid) {
+          return [response.body.artist].concat(recursiveResults);
+        } else {
+          return;
+        }
+      });
+    } else {
+      // Done looping
+      if (response.body.artist.mbid) {
+        return [response.body.artist];
+      } else {
+        return;
+      }
+    }
+  });
+}
 
 var _getEntityCount = (type, callback) => {
 

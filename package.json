@@ -2,7 +2,7 @@
   "name": "m3server",
   "version": "1.0.0",
   "description": "Mean Meta Music Server",
-  "main": "promise.js",
+  "main": "server.js",
   "scripts": {
     "test": "m3server_test"
   },
@@ -13,7 +13,6 @@
     "@jsonforms/examples": "^2.2.0",
     "@jsonforms/material-renderers": "^2.2.0",
     "amazon-product-api": "^0.4.4",
-    "bhttp": "^1.2.4",
     "billboard-top-100": "^2.4.1",
     "bluebird": "^3.5.3",
     "config": "^3.0.1",

@@ -2,7 +2,7 @@ var Promise = require("bluebird");
 const util = require('util');
 const request = util.promisify(require("request"));
 
-function _searchLastFMArtist(similarArtists) {
+var _searchLastFMArtist = (similarArtists) => {
   return Promise.try(function () {
     //similarArtists.reverse();
     let name = similarArtists[similarArtists.length - 1];
