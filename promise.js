@@ -1,6 +1,35 @@
+var Promise = require("bluebird");
 const util = require('util');
 const request = util.promisify(require("request"));
-const Promise = require("bluebird");
+
+function _searchLastFMArtist(similarArtists) {
+  return Promise.try(function () {
+    //similarArtists.reverse();
+    let name = similarArtists[similarArtists.length - 1];
+    let options = _buildLastFMSearchUrl(name, 'artist');
+    return request(options);
+  }).then(function (response) {
+    similarArtists.pop();
+    if (similarArtists.length > 0) {
+      return Promise.try(function () {
+        return _searchLastFMArtist(similarArtists);
+      }).then(function (recursiveResults) {
+        if (response.body.artist.mbid) {
+          return [response.body.artist].concat(recursiveResults);
+        } else {
+          return;
+        }
+      });
+    } else {
+      // Done looping
+      if (response.body.artist.mbid) {
+        return [response.body.artist];
+      } else {
+        return;
+      }
+    }
+  });
+}
 
 var _updateLastFMArtist = (id) => {
   var options = _buildLastFMLookupUrl(id, 'artist');
@@ -13,49 +42,44 @@ var _updateLastFMArtist = (id) => {
       if (results['body']['artist']) {
         let document = {};
         let artist = results['body']['artist'];
-        let imageUlr = '';
+        let name = artist['name'];
+        let imageUrl = '';
         for (const image of artist['image']) {
           if (image['size'] === 'mega') {
-            document['image'] = image['#text'];
+            document['image_url'] = image['#text'];
           }
         }
 
         let similarArtists = [];
+        document['similar_artists'] = [];
         for (artist of artist['similar']['artist']) {
           similarArtists.push(artist['name']);
         }
 
+        Promise.try(function () {
+          //similarArtists = ['nas', 'mobb deep', 'AZ', 'Foxy Brown', 'Raekwon'];
+          return _searchLastFMArtist(similarArtists);
+        }).then(function (results) {
+          // Now `results` is an array that contains the response for each HTTP request made.
+          //console.log(results);
+          for (artist of results) {
+            let name = artist['name'];
+            let mbid = artist['mbid']
+            let imageUrl = '';
+            for (const image of artist['image']) {
+              if (image['size'] === 'mega') {
+                imageUrl = image['#text'];
+              }
+            }
+            document['similar_artists'].push({
+              name: name,
+              image_url: imageUrl,
+              mbid: mbid
+            });
+          }
+          console.log(document);
+        })
       }
-    })
-    .then(results => {
-      console.log(results);
-      // document['similar_artists'] = [];
-      // for (const similarArtist of artist['similar']['artist']) {
-      //   let imageUrl = '';
-      //   let mbid = similarArtist['mbid'];
-      //   let name = similarArtist['name'];
-
-      //   if (similarArtist['image']) {
-      //     for (const image of similarArtist['image']) {
-      //       //_searchLastFMArtist(name, 'artist');
-      //       var options = _buildLastFMSearchUrl(name, 'artist');
-      //       request(options)
-      //         .then(results => {
-      //           if (results['body']['artist']) {
-      //             mbid = artist['mbid'];
-      //           }
-      //         });
-      //       if (image['size'] === 'mega') {
-      //         imageUrl = image['#text']
-      //       }
-      //     }
-      //   }
-      //   document['similar_artists'].push({
-      //     name: name,
-      //     image_url: imageUrl
-      //   });
-      // }
-      // //console.log(document);
     })
     .catch(err => {
       console.log(err);
@@ -88,23 +112,5 @@ var _buildLastFMSearchUrl = (name, type) => {
 
   return options;
 }
-
-// var _searchLastFMArtist = (name, type) => {
-//   var options = _buildLastFMSearchUrl(name, type);
-//   request(options, (err, res, entity) => {
-//     if (err) {
-//       console.log(name, err);
-//       callback(null);
-//     }
-//     if ((entity &&
-//       entity['error']
-//       && entity['message'])
-//       && !entity['artist']) {
-//       console.log(name, entity['message']);
-//     }
-
-//     callback(entity['artist']['mbid']);
-//   });
-// };
 
 _updateLastFMArtist('5b11f4ce-a62d-471e-81fc-a69a8278c7da');
