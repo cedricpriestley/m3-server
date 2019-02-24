@@ -2,7 +2,7 @@
   "name": "m3server",
   "version": "1.0.0",
   "description": "Mean Meta Music Server",
-  "main": "server.js",
+  "main": "promise.js",
   "scripts": {
     "test": "m3server_test"
   },
@@ -24,5 +24,9 @@
     "mongoose": "^5.4.10",
     "mysql": "^2.16.0",
     "slugify": "^1.3.4"
+  },
+  "devDependencies": {
+    "promise-request": "^0.1.2",
+    "request-promise": "^4.2.4"
   }
 }

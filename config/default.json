@@ -1,7 +1,8 @@
 {
   "general": {
     "import": {
-      "autoImport": false,
+      "autoImportRelations": true,
+      "autoUpdateEntity": false,
       "useMbJson": false
     }
   }
