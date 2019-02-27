@@ -19,10 +19,12 @@ const autoImportForeignEntities = config.get('general.import.autoImportRelations
 
 let entitySchema = new Schema(
   {
+    /*
     _id: {
       type: Number,
       required: true
     },
+    */
     id: {
       type: String,
       required: true
@@ -50,33 +52,38 @@ exports.importEntity = (req, res, next) => {
   const id = req.params['id'];
   const type = req.params['type'];
   console.log('/api/:type/import/:id', id, type);
-  _getEntity(id, type, entity => {
-    if (!entity) {
-      console.log(`  ${type} ${id} not found`);
-      _insertEntity(id, type, result => {
-        console.log(`  ${type} ${id} insert`);
-        _getEntity(id, type, entity => {
-          if (entity) {
-            console.log(`  ${type} ${id} found`);
-          } else {
-            console.log(`${type} ${id} not found`);
-          }
-          res.send(entity);
-        });
-      });
-    } else {
-      _resetEntity(entity, type, (result) => {
-        console.log(`  ${type} ${id} resetted`);
-        _updateEntity(entity.id, type, (result) => {
-          console.log(`  ${type} ${id} updated`);
-          _getEntity(id, type, (entity) => {
-            console.log(`  ${type} ${id} found`);
-            res.send(entity)
+  //_getEntity(id, type, entity => {
+  _getEntity(id, type)
+    .then(entity => {
+      return entity;
+    })
+    .then(entity => {
+      if (!entity) {
+        console.log(`  ${type} ${id} not found`);
+        _insertEntity(id, type, result => {
+          console.log(`  ${type} ${id} insert`);
+          _getEntity(id, type, entity => {
+            if (entity) {
+              console.log(`  ${type} ${id} found`);
+            } else {
+              console.log(`${type} ${id} not found`);
+            }
+            res.send(entity);
           });
         });
-      });
-    }
-  });
+      } else {
+        _resetEntity(entity, type, (result) => {
+          console.log(`  ${type} ${id} resetted`);
+          _updateEntity(entity.id, type, (result) => {
+            console.log(`  ${type} ${id} updated`);
+            _getEntity(id, type, (entity) => {
+              console.log(`  ${type} ${id} found`);
+              res.send(entity)
+            });
+          });
+        });
+      }
+    });
 };
 
 exports.resetEntity = (req, res, next) => {
@@ -131,30 +138,32 @@ var _updateLastFMArtist = (id) => {
       }
       if (results['body']['artist']) {
         let document = {};
+        document['images'] = [];
         let artist = results['body']['artist'];
         for (const image of artist['image']) {
           if (image['size'] === 'mega') {
-            document['image_url'] = image['#text'];
+            document['images'].push(image['#text']);
           }
         }
 
         let similarArtists = [];
         document['similar_artists'] = [];
-        for (artist of artist['similar']['artist']) {
-          similarArtists.push(artist['name']);
+        for (simArtist of artist['similar']['artist']) {
+          similarArtists.push(simArtist['name']);
         }
 
         Promise.try(function () {
-          //similarArtists = ['nas', 'mobb deep', 'AZ', 'Foxy Brown', 'Raekwon'];
+          if (artist['similar']['artist'].length == 0) return [];
           return _searchLastFMArtist(similarArtists);
+
         }).then(function (results) {
           // Now `results` is an array that contains the response for each HTTP request made.
-          //console.log(results);
-          for (const artist of results) {
-            let name = artist['name'];
-            let mbid = artist['mbid'];
+          for (const simArtist of results) {
+            if (!simArtist || !simArtist['mbid']) continue;
+            let name = simArtist['name'];
+            let mbid = simArtist['mbid'];
             let imageUrl = '';
-            for (const image of artist['image']) {
+            for (const image of simArtist['image']) {
               if (image['size'] === 'mega') {
                 imageUrl = image['#text'];
               }
@@ -162,7 +171,7 @@ var _updateLastFMArtist = (id) => {
             document['similar_artists'].push({
               name: name,
               image_url: imageUrl,
-              mbid: mbid
+              id: mbid
             });
           }
           //document['last_updated'] = new Date();
@@ -170,8 +179,8 @@ var _updateLastFMArtist = (id) => {
           entitySchema.options.collection = 'artist';
 
           entitySchema.add({
-            image_url: {
-              type: String,
+            images: {
+              type: [],
               required: false
             }
           }
@@ -183,10 +192,14 @@ var _updateLastFMArtist = (id) => {
             }
           }
           );
+
           Entity = mongoose.model('artist', entitySchema);
-          Entity.updateOne({ id: id }, document)
-            //document
-            //.save()
+          Entity.updateOne({ id: id }, {
+            $set: {
+              images: document['images'],
+              similar_artists: document['similar_artists']
+            }
+          })
             .then(result => {
               console.log(result);
             })
@@ -202,30 +215,32 @@ var _updateLastFMArtist = (id) => {
 };
 
 var _getEntity = (id, type, callback) => {
-  entitySchema.options.collection = type.replace('-', '_');
-  Entity = mongoose.model(type, entitySchema);
-  Entity.findOne({ id: id })
-    .then(entity => {
-      if (!entity) {
-        _insertEntity(id, type, result => {
-          _getEntity(id, type, entity => {
-            switch (type) {
-              case 'artist':
-                _updateLastFMArtist(id, result => {
-                });
-              case 'release':
-                break;
-              default:
-                break;
-            }
+  return Promise.try(function () {
+    entitySchema.options.collection = type.replace('-', '_');
+    Entity = mongoose.model(type, entitySchema);
+    Entity.findOne({ id: id })
+      .then(entity => {
+        if (!entity) {
+          _insertEntity(id, type, result => {
+            _getEntity(id, type, entity => {
+              switch (type) {
+                case 'artist':
+                  _updateLastFMArtist(id, result => {
+                  });
+                case 'release':
+                  break;
+                default:
+                  break;
+              }
+            });
           });
-        });
-      }
-      callback(entity);
-    })
-    .catch(err => {
-      console.log(err)
-    });
+        }
+        callback(entity);
+      })
+      .catch(err => {
+        console.log(err)
+      });
+  });
 }
 
 var _searchLastFMArtist = (similarArtists) => {
@@ -240,18 +255,18 @@ var _searchLastFMArtist = (similarArtists) => {
       return Promise.try(function () {
         return _searchLastFMArtist(similarArtists);
       }).then(function (recursiveResults) {
-        if (response.body.artist.mbid) {
+        if (response.body.artist) {
           return [response.body.artist].concat(recursiveResults);
         } else {
-          return;
+          return recursiveResults;
         }
       });
     } else {
       // Done looping
-      if (response.body.artist.mbid) {
+      if (response.body.artist) {
         return [response.body.artist];
       } else {
-        return;
+        return [response.body.artist];
       }
     }
   });
@@ -292,16 +307,29 @@ var _insertEntity = (id, type, callback) => {
 
     document['last_updated'] = new Date();
 
+    if (type === 'release') {
+      _getReleaseCoverArt(id)
+        .then(url => {
+          document['coverart_url'] = url;
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    }
+
     _getNextId(type, (nextId) => {
-      document['_id'] = nextId;
+      //document['_id'] = nextId;
       _getEntityModel(type, document)
         .save()
         .then(result => {
+
           if (autoImportForeignEntities) {
             _importForeignEntities(entity, type, (result) => {
             });
           }
           callback(result);
+        })
+        .then(results => {
         })
         .catch(err => {
           console.log(err);
@@ -310,6 +338,29 @@ var _insertEntity = (id, type, callback) => {
     });
   });
 }
+
+var _getReleaseCoverArt = async (id, callback) => {
+  let coverArtUrl = `http://coverartarchive.org/release/${id}`;
+  var options = {
+    url: coverArtUrl,
+    headers: {
+      'User-Agent': 'm3 server 100.115.92.202'
+    },
+    json: true
+  };
+  await request(options)
+    .then(results => {
+      for (const image of results.body.images) {
+        if (image['front'] === true) {
+          //document['coverart_url'] = image['image'];
+          callback(image['image']);
+        }
+      }
+    })
+    .catch(err => {
+      console.log(err);
+    })
+};
 
 var _updateEntity = (id, type, callback) => {
 
@@ -485,7 +536,7 @@ var _buildLastFMSearchUrl = (name, type) => {
 
 var _buildLastFMLookupUrl = (mbid, type) => {
   const url = `http://ws.audioscrobbler.com/2.0/?method=${type}.getinfo&mbid=${mbid}&format=json&api_key=e1182eaac16ae88fec850af3a0e7ab19&format=json`;
-
+  console.log(url);
   var options = {
     url: url,
     headers: {

@@ -1,0 +1,15 @@
+{
+  "typeId": "6fd8f29a-3d0a-32fc-980d-ea697b69da78",
+  "type": "City",
+  "tags": [],
+  "id": "c920948b-83e3-40b7-8fe9-9ab5abaac55b",
+  "sortName": "Houston",
+  "name": "Houston",
+  "lifeSpan": {
+    "ended": false,
+    "begin": null,
+    "end": null
+  },
+  "aliases": [],
+  "disambiguation": ""
+}
