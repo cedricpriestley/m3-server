@@ -31,7 +31,7 @@ const areaSchema = new Schema(
         locale: { type: String },
         typeId: { type: String, ref: 'AreaAliasType' },
         sortName: { type: String },
-        name: { type: Sting },
+        name: { type: String },
         end: { type: String },
         primary: { type: Boolean },
         ended: { type: Boolean }
@@ -39,6 +39,10 @@ const areaSchema = new Schema(
     ],
     disambiguation: { type: String },
     lastUpdated: { type: Date, default: Date.now },
+  },
+  {
+    strict: false,
+    collection: "area"
   }
 );
 
@@ -50,7 +54,7 @@ const areaTypeSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'AreaType',
     },
-    childOrder: { type: Integer },
+    childOrder: { type: Number },
     description: { type: String },
     lastUpdated: { type: Date, default: Date.now },
   }
@@ -64,12 +68,12 @@ const areaAliasTypeSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'AreaAliasType',
     },
-    childOrder: { type: Integer },
+    childOrder: { type: Number },
     description: { type: String },
     lastUpdated: { type: Date, default: Date.now },
   }
 );
 
-module.exports.area = mongoose.model('Area', areaSchema);
-module.exports.areaType = mongoose.model('AreaType', areaTypeSchema);
-module.exports.areaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);
+module.exports = mongoose.model('area', areaSchema);
+//module.exports.AreaType = mongoose.model('AreaType', areaTypeSchema);
+//module.exports.AreaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);

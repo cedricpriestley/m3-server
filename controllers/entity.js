@@ -1,3 +1,4 @@
+const express = require('express');
 const mongoose = require('mongoose');
 //const Entity = require('../models/entity');
 const mongodbUrl = 'mongodb://localhost:27017';
@@ -16,6 +17,8 @@ const Schema = mongoose.Schema;
 const useMbJson = config.get('general.import.useMbJson');
 const autoUpdateEntity = config.get('general.import.autoUpdateEntity');
 const autoImportForeignEntities = config.get('general.import.autoImportRelations');
+
+const app = express();
 
 let entitySchema = new Schema(
   {
@@ -47,6 +50,19 @@ exports.getEntity = (req, res, next) => {
     return res.send(entity);
   });
 };
+
+exports.browseEntities = (req, res, next) => {
+  console.log('/api/artist/browse/:offset/:count');
+  const type = req.params['type'].toLowerCase();
+  const offset = req.params['offset'];
+  const count = req.params['count'];
+
+  _browseEntities(type, offset, count, (documents) => {
+    if (documents && documents.length >= 0) {
+      res.send(documents);
+    }
+  });
+}
 
 exports.importEntity = (req, res, next) => {
   const id = req.params['id'];
@@ -475,7 +491,8 @@ var _getEntityModel = (type, document) => {
   return entity;
 }
 
-var browseArtists = (offset, count, callback) => {
+var _browseEntities = (type, offset, count, callback) => {
+
   const MongoClient = require('mongodb').MongoClient;
 
   MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
@@ -484,7 +501,7 @@ var browseArtists = (offset, count, callback) => {
 
     const db = client.db(mongodbName);
 
-    collection = db.collection("artist");
+    collection = db.collection(type);
     collection.find({ "name": { $ne: null } })
       .limit(parseInt(count))
       .skip(parseInt(offset))
