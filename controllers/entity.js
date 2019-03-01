@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-//const Entity = require('../models/entity');
+const Area = require('../models/area');
 const mongodbUrl = 'mongodb://localhost:27017';
 const mongodbName = 'mbz';
 const slugify = require('slugify');
@@ -232,8 +232,8 @@ var _updateLastFMArtist = (id) => {
 
 var _getEntity = (id, type, callback) => {
   return Promise.try(function () {
-    entitySchema.options.collection = type.replace('-', '_');
-    Entity = mongoose.model(type, entitySchema);
+
+    Entity = _getEntityModel(type);
     Entity.findOne({ id: id })
       .then(entity => {
         if (!entity) {
@@ -289,9 +289,8 @@ var _searchLastFMArtist = (similarArtists) => {
 }
 
 var _getEntityCount = (type, callback) => {
+  let Entity = _getEntityModel(type);
 
-  entitySchema.options.collection = type.replace('-', '_');
-  Entity = mongoose.model(type, entitySchema);
   Entity
     .countDocuments()
     .then(result => {
@@ -484,11 +483,14 @@ var _importForeignEntities = (doc, type, callback) => {
   };
 }
 
-var _getEntityModel = (type, document) => {
-  entitySchema.options.collection = type.replace('-', '_');
-  let Entity = mongoose.model(type, entitySchema);
-  let entity = new Entity(document);
-  return entity;
+var _getEntityModel = (type) => {
+
+  switch (type) {
+    case "area":
+      return Area;
+    default:
+      throw new Error('Entity model not found.');
+  }
 }
 
 var _browseEntities = (type, offset, count, callback) => {

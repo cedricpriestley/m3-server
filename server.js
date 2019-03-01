@@ -4,6 +4,7 @@ const graphqlHttp = require('express-graphql');
 const bodyParser = require('body-parser');
 const graphqlSchema = require('./schema');
 const graphqlResolver = require('./resolvers');
+const cors = require('cors');
 
 const entityRoutes = require('./routes/entity');
 //const errorController = require('./controllers/error');
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 
 app.use(
   '/graphql',
+  cors(),
   graphqlHttp({
     schema: graphqlSchema,
     rootValue: graphqlResolver,

@@ -9,7 +9,7 @@ module.exports = buildSchema(`
 
   type Area {
     _id: ID!
-    mbid: String!
+    id: String!
     name: String!
     disambiguation: String
     type: String!
@@ -28,7 +28,7 @@ module.exports = buildSchema(`
   }
 
   input AreaInput {
-    mbid: String!
+    id: String!
     name: String!
     disambiguation: String
     type: String!
@@ -40,7 +40,7 @@ module.exports = buildSchema(`
 
   type Query {
     getAreas(limit: Int, offset: Int) : [Area]
-    getArea(mbid: String!) : Area
+    getArea(id: String!) : Area
   }
 
   type Mutation {
