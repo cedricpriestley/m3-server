@@ -1,4 +1,6 @@
-const { buildSchema } = require('graphql');
+const {
+  buildSchema
+} = require('graphql');
 
 module.exports = buildSchema(`
   type LifeSpan {
@@ -9,16 +11,24 @@ module.exports = buildSchema(`
 
   type Area {
     _id: ID!
-    id: String!
+    mbid: String!
     name: String!
     disambiguation: String
-    type: String!
+    type: String
     typeId: String!
     sortName: String!
     aliases: [String!]
     lifeSpan: LifeSpan
     slug: String!
     lastUpdated: String!
+  }
+
+  type Artist {
+    _id: ID!
+    id: String!
+    name: String!
+    disambiguation: String
+    type: String
   }
 
   input LifeSpanInput {
@@ -28,7 +38,7 @@ module.exports = buildSchema(`
   }
 
   input AreaInput {
-    id: String!
+    mbid: String!
     name: String!
     disambiguation: String
     type: String!
@@ -40,12 +50,13 @@ module.exports = buildSchema(`
 
   type Query {
     getAreas(limit: Int, offset: Int) : [Area]
-    getArea(id: String!) : Area
+    getArea(mbid: String!) : Area
+    getArtists(limit: Int, offset: Int) : [Artist]
   }
 
   type Mutation {
     createArea(area: AreaInput!): Area
     updateArea(area: AreaInput!): Area
-    deleteArea(_id: Int!): Boolean
+    deleteArea(mbid: Int!): Boolean
   }
 `);

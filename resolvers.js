@@ -1,15 +1,35 @@
 //import { Area, AreaType, AreaAliasType } from './models/area';
-const Area = require('./models/area');
+//const Area = require('./models/area');
+//const Artist = require('./models/artist');
 //const Area = require('./schema');
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
 const validator = require('validator');
+
+let entitySchema = new Schema({
+  id: {
+    type: String,
+    required: true
+  },
+  name: {
+    type: String,
+    required: false
+  },
+}, {
+  strict: false
+});
+
 module.exports = {
   getAreas: async (args, obj, context, info) => {  // the args object contains the GraphQL-parameters of the function
     // do the dastabase stuff
     const limit = args.limit || '10';
     const offset = args.offset || '0';
 
-    const areas = Area.find({ "name": { $ne: null } })
+    entitySchema.options.collection = 'area';
+    Entity = mongoose.model('area', entitySchema);
+
+    const areas = Entity.find({ "name": { $ne: null } })
       .limit(parseInt(limit))
       .skip(parseInt(offset))
       .sort({ name: 1 })
@@ -24,7 +44,10 @@ module.exports = {
   resetArea: async (args, obj, context, info) => {
     const id = args.id;
 
-    let area = Area.find({ id: id });
+    entitySchema.options.collection = 'area';
+    Entity = mongoose.model('area', entitySchema);
+
+    let area = Entity.find({ id: id });
 
     if (area) {
       for (const key in area) {
@@ -43,13 +66,20 @@ module.exports = {
   getArea: (obj, args, context, info) => {
     const id = args.id;
 
-    let area = Area.find({ id: id });
+    entitySchema.options.collection = 'area';
+    Entity = mongoose.model('area', entitySchema);
+
+    let area = Entity.find({ id: id });
 
     return area;
   },
-  createArea: async function ({ areaInput }, req) {
-    // const id = areaInput.id
-    const existingArea = await Area.findOne({ id: areaInput.id });
+  createArea: async function (obj, args, context, info) {
+     // const mbid = areaInput.mbid
+     console.log(obj);
+     return;
+     entitySchema.options.collection = 'area';
+     Entity = mongoose.model('area', entitySchema);
+    const existingArea = await Entity.findOne({ mbid: areaInput.mbid });
     if (existingArea) {
       //const error = new Error("Area exists already!");
       //throw error;
@@ -73,7 +103,7 @@ module.exports = {
     var date = new Date();
 
     const area = new Area({
-      id: areaInput.id,
+      mbid: areaInput.mbid,
       name: areaInput.name,
       updatedDate: date
     });
@@ -81,7 +111,24 @@ module.exports = {
     const createdArea = await area.save();
     return { ...createdArea._doc, _id: createdArea._id.toString() };
   },
-  updateMbzArtist: async function ({ artistInput }, req) {
+  getArtists: async (args, obj, context, info) => {  // the args object contains the GraphQL-parameters of the function
+    // do the dastabase stuff
+    const limit = args.limit || '10';
+    const offset = args.offset || '0';
 
-  }
+    entitySchema.options.collection = 'artist';
+    Entity = mongoose.model('artist', entitySchema);
+
+    const artists = Entity.find({ "name": { $ne: null } })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .sort({ name: 1 })
+      .exec();
+
+    if (!artists) {
+      throw new Error('error');
+    }
+
+    return artists;
+  },
 };

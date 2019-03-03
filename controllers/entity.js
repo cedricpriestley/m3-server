@@ -1,8 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Area = require('../models/area');
-const mongodbUrl = 'mongodb://localhost:27017';
-const mongodbName = 'mbz';
+//const Area = require('../models/area');
+//const Artist = require('../models/artist');
 const slugify = require('slugify');
 const Enum = require('../sandbox/enums');
 const config = require('config');
@@ -20,14 +19,11 @@ const autoImportForeignEntities = config.get('general.import.autoImportRelations
 
 const app = express();
 
-let entitySchema = new Schema(
-  {
-    /*
-    _id: {
-      type: Number,
-      required: true
-    },
-    */
+
+const entities = ['area', 'artist'];
+const Entities = [];
+for (entity of entities) {
+  var entitySchema = new Schema({
     id: {
       type: String,
       required: true
@@ -36,11 +32,15 @@ let entitySchema = new Schema(
       type: String,
       required: false
     },
-  },
-  {
+  }, {
+    collection: entity,
     strict: false
+  });
+
+  if (!Entities[entity] ) {
+    Entities[entity] = mongoose.model(entity, entitySchema);
   }
-);
+}
 
 exports.getEntity = (req, res, next) => {
   const id = req.params.id;
@@ -109,8 +109,7 @@ exports.resetEntity = (req, res, next) => {
 
   _getEntity(id, type, (entity) => {
     if (entity) {
-      _resetEntity(entity, type, (results) => {
-      });
+      _resetEntity(entity, type, (results) => {});
     }
   });
 };
@@ -120,23 +119,26 @@ exports.getEntityCount = (req, res, next) => {
   console.log('/api/:type/count', type);
   if (app.get('${type}Count')) {
     let count = app.get('${type}Count');
-    res.send([{ count }]);
+    res.send([{
+      count
+    }]);
   } else {
     _getEntityCount(type, count => {
       app.set('${type}Count', count);
-      res.send([{ count }]);
+      res.send([{
+        count
+      }]);
     });
   }
 };
 
 var _getNextId = (type, callback) => {
 
-  entitySchema.options.collection = type.replace('-', '_');
-  Entity = mongoose.model(type, entitySchema);
-
-  Entity
+  Entities[type.replace('-', '_')]
     .find()
-    .sort({ _id: -1 })
+    .sort({
+      _id: -1
+    })
     .limit(1)
     .exec((error, result) => {
       let nextId = (result[0]) ? result[0]._id + 1 : 1;
@@ -192,6 +194,7 @@ var _updateLastFMArtist = (id) => {
           }
           //document['last_updated'] = new Date();
 
+          entitySchema = Entities[type.replace('-', '_')].Schema;
           entitySchema.options.collection = 'artist';
 
           entitySchema.add({
@@ -199,23 +202,22 @@ var _updateLastFMArtist = (id) => {
               type: [],
               required: false
             }
-          }
-          );
+          });
           entitySchema.add({
             similar_artists: {
               type: [],
               required: false
             }
-          }
-          );
+          });
 
-          Entity = mongoose.model('artist', entitySchema);
-          Entity.updateOne({ id: id }, {
-            $set: {
-              images: document['images'],
-              similar_artists: document['similar_artists']
-            }
-          })
+          Entities[type.replace('-', '_')].updateOne({
+              id: id
+            }, {
+              $set: {
+                images: document['images'],
+                similar_artists: document['similar_artists']
+              }
+            })
             .then(result => {
               console.log(result);
             })
@@ -232,17 +234,17 @@ var _updateLastFMArtist = (id) => {
 
 var _getEntity = (id, type, callback) => {
   return Promise.try(function () {
-
-    Entity = _getEntityModel(type);
-    Entity.findOne({ id: id })
+    console.log(type);
+    Entities[type.replace('-', '_')].findOne({
+        id: id
+      })
       .then(entity => {
         if (!entity) {
           _insertEntity(id, type, result => {
             _getEntity(id, type, entity => {
               switch (type) {
                 case 'artist':
-                  _updateLastFMArtist(id, result => {
-                  });
+                  _updateLastFMArtist(id, result => {});
                 case 'release':
                   break;
                 default:
@@ -289,9 +291,9 @@ var _searchLastFMArtist = (similarArtists) => {
 }
 
 var _getEntityCount = (type, callback) => {
-  let Entity = _getEntityModel(type);
-
-  Entity
+  callback(4);
+  return;
+  Entities[type.replace('-', '_')]
     .countDocuments()
     .then(result => {
       callback(result);
@@ -307,18 +309,22 @@ var _insertEntity = (id, type, callback) => {
 
   request(options, (err, res, entity) => {
 
-    if (err) { return console.log(err); }
+    if (err) {
+      return console.log(err);
+    }
 
     let document = {};
     for (const key in entity) {
-      document[key] = entity[key];
+      document[key.replace('-', '_')] = entity[key];
     }
 
-    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation)
-      ? '-' + (entity.disambiguation) : '').replace(/\//g, '-');
+    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation) ?
+      '-' + (entity.disambiguation) : '').replace(/\//g, '-');
 
     document['slug'] = type + "/" +
-      slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
+      slugify(slug, {
+        remove: /[*+~.()\'"!:@]/g
+      }).toLowerCase();
 
     document['last_updated'] = new Date();
 
@@ -332,25 +338,22 @@ var _insertEntity = (id, type, callback) => {
         });
     }
 
-    _getNextId(type, (nextId) => {
-      //document['_id'] = nextId;
-      _getEntityModel(type, document)
-        .save()
-        .then(result => {
+    entity = new Entities[type.replace('-', '_')](document);
+    entity
+      .save()
+      .then(result => {
 
-          if (autoImportForeignEntities) {
-            _importForeignEntities(entity, type, (result) => {
-            });
-          }
-          callback(result);
-        })
-        .then(results => {
-        })
-        .catch(err => {
-          console.log(err);
-          callback(err);
-        });
-    });
+        if (autoImportForeignEntities) {
+          _importForeignEntities(entity, type, (result) => {});
+        }
+        callback(result);
+      })
+      .then(results => {})
+      .catch(err => {
+        console.log(err);
+        callback(err);
+      });
+    //});
   });
 }
 
@@ -382,30 +385,33 @@ var _updateEntity = (id, type, callback) => {
   var options = _buildEntityLookupUrl(id, type);
 
   request(options, (err, res, entity) => {
-    if (err) { return console.log(err); }
+    if (err) {
+      return console.log(err);
+    }
 
     let document = {};
 
     for (const key in entity) {
       if (key != 'id') {
-        document[key] = entity[key];
+        document[key.replace('-', '_')] = entity[key];
       }
     }
 
-    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation)
-      ? '-' + (entity.disambiguation) : '').replace(/\//g, '-');
+    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation) ?
+      '-' + (entity.disambiguation) : '').replace(/\//g, '-');
 
     //    updateValues['slug'] =
     //    slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
 
     document['last_updated'] = new Date();
 
-    _getEntityModel(type, document)
-      .updateOne({ id: id }, document)
+    Entities[type.replace("-", "_")]
+      .updateOne({
+        id: id
+      }, document)
       .then(result => {
         if (autoImportForeignEntities) {
-          _importForeignEntities(entity, type, (foreignResult) => {
-          });
+          _importForeignEntities(entity, type, (foreignResult) => {});
         }
         callback(result);
       })
@@ -418,30 +424,22 @@ var _updateEntity = (id, type, callback) => {
 
 var _resetEntity = (document, type, callback) => {
 
-  const MongoClient = require('mongodb').MongoClient;
+  const entityType = type.replace('-', '_');
 
-  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
-    assert.equal(null, err);
+  let unsetValues = {};
 
-    const entityType = type.replace('-', '_');
-    const db = client.db(mongodbName);
-    const collection = db.collection(entityType);
-
-    let unsetValues = {};
-
-    for (const key in document) {
-      if (key != '_id' && key != 'id' && key != 'slug') {
-        unsetValues[key] = '';
-      }
+  for (const key in document) {
+    if (key != '_id' && key != 'id' && key != 'slug') {
+      unsetValues[key] = '';
     }
+  }
 
-    collection.updateOne(
-      { id: document['id'] },
-      { $unset: unsetValues }
-      , (err, result) => {
-        callback();
-      });
-    client.close();
+  Entities[type.replace('-', '_')].updateOne({
+    id: document['id']
+  }, {
+    $unset: unsetValues
+  }, (err, result) => {
+    callback();
   });
 }
 
@@ -466,8 +464,8 @@ var _importForeignEntities = (doc, type, callback) => {
               _updateEntity(entity.id, foreignType, (result) => {
                 switch (type) {
                   case 'artist':
-                  //_updateLastFMArtistData(id, type, result => {
-                  //});
+                    //_updateLastFMArtistData(id, type, result => {
+                    //});
                   case 'release':
                     break;
                   default:
@@ -484,59 +482,56 @@ var _importForeignEntities = (doc, type, callback) => {
 }
 
 var _getEntityModel = (type) => {
+  entitySchema.options.collection = type.replace('-', '_');
+  return mongoose.model(type, entitySchema);
+}
+
+var _getEntityModel2 = (type, document) => {
+  entitySchema.options.collection = type.replace('-', '_');
+  let e = mongoose.model(type, entitySchema);
+  return new e(document);
+}
+
+var _getEntityModel3 = (type) => {
 
   switch (type) {
     case "area":
-      return Area;
+      //return Area;
     default:
       throw new Error('Entity model not found.');
   }
 }
 
 var _browseEntities = (type, offset, count, callback) => {
-
-  const MongoClient = require('mongodb').MongoClient;
-
-  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
-    assert.equal(null, err);
-    //console.log("Connected successfully to server");
-
-    const db = client.db(mongodbName);
-
-    collection = db.collection(type);
-    collection.find({ "name": { $ne: null } })
-      .limit(parseInt(count))
-      .skip(parseInt(offset))
-      .sort({ name: 1 }).toArray((err, documents) => {
-        //assert.equal(err, null);
-        callback(documents);
-      });
-
-    client.close();
-  });
-}
-
-var searchArtist = (term, callback) => {
-
-  const MongoClient = require('mongodb').MongoClient;
-
-  MongoClient.connect(mongodbUrl, { useNewUrlParser: true }, (err, client) => {
-    assert.equal(null, err);
-    //console.log("Connected successfully to server");
-
-    const db = client.db(mongodbName);
-
-    collection = db.collection("artist");
-    term = '"' + term + '"';
-
-    collection.find({
-      $text: { $search: term, $caseSensitive: false }
+  callback([]);
+  return;
+  Entities[type.replace('-', '_')].find({
+      "name": {
+        $ne: null
+      }
+    })
+    .limit(parseInt(count))
+    .skip(parseInt(offset))
+    .sort({
+      name: 1
     }).toArray((err, documents) => {
       //assert.equal(err, null);
       callback(documents);
     });
+}
 
-    client.close();
+var searchArtist = (term, callback) => {
+
+  term = '"' + term + '"';
+
+  Entities[type.replace('-', '_')].find({
+    $text: {
+      $search: term,
+      $caseSensitive: false
+    }
+  }).toArray((err, documents) => {
+    //assert.equal(err, null);
+    callback(documents);
   });
 }
 
@@ -615,7 +610,13 @@ const getForeignEntities = type => {
     case "area":
       return [];
     case "artist":
-      return [{ "area": "area" }, { "begin_area": "area" }, { "end_area": "area" }];
+      return [{
+        "area": "area"
+      }, {
+        "begin_area": "area"
+      }, {
+        "end_area": "area"
+      }];
     case "label":
     case "work":
       return [];
