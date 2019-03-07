@@ -2,78 +2,94 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 
-const areaSchema = new Schema(
-  {
-    typeId: {
-      type: Schema.Types.ObjectId,
-      ref: 'AreaType',
+const areaSchema = new Schema({
+  type: {
+    type: String
+  },
+  type_id: {
+    type: String
+  },
+  tags: [{
+    name: {
+      type: String,
       required: true
     },
-    type: { type: String },
-    tag: [
-      {
-        name: { type: String, required: true },
-        count: { type: Number, required: false }
-      }
-    ],
-    mbid: { type: String, required: true },
-    sortName: { type: String },
-    name: { type: String, required: true },
-    lifeSpan: {
-      ended: { type: Boolean },
-      begin: { type: String },
-      end: { type: String }
-    },
-    aliases: [
-      {
-        begin: { type: String },
-        type: { type: String },
-        locale: { type: String },
-        typeId: { type: String, ref: 'AreaAliasType' },
-        sortName: { type: String },
-        name: { type: String },
-        end: { type: String },
-        primary: { type: Boolean },
-        ended: { type: Boolean }
-      }
-    ],
-    disambiguation: { type: String },
-    lastUpdated: { type: Date, default: Date.now },
+    count: {
+      type: Number,
+      required: false
+    }
+  }],
+  id: {
+    type: String,
+    required: true
   },
-  {
-    strict: false,
-    collection: "area"
-  }
-);
-
-const areaTypeSchema = new Schema(
-  {
-    mbid: { type: String, required: true },
-    name: { type: String, required: true },
-    parent: {
-      type: Schema.Types.ObjectId,
-      ref: 'AreaType',
+  sort_name: {
+    type: String
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  life_span: {
+    ended: {
+      type: Boolean
     },
-    childOrder: { type: Number },
-    description: { type: String },
-    lastUpdated: { type: Date, default: Date.now },
-  }
-);
-
-const areaAliasTypeSchema = new Schema(
-  {
-    mbid: { type: String, required: true },
-    name: { type: String, required: true },
-    parent: {
-      type: Schema.Types.ObjectId,
-      ref: 'AreaAliasType',
+    begin: {
+      type: String
     },
-    childOrder: { type: Number },
-    description: { type: String },
-    lastUpdated: { type: Date, default: Date.now },
-  }
-);
+    end: {
+      type: String
+    }
+  },
+  aliases: [{
+    begin: {
+      type: String
+    },
+    type: {
+      type: String
+    },
+    locale: {
+      type: String
+    },
+    type_id: {
+      type: String
+    },
+    sortName: {
+      type: String
+    },
+    name: {
+      type: String
+    },
+    end: {
+      type: String
+    },
+    primary: {
+      type: Boolean
+    },
+    ended: {
+      type: Boolean
+    }
+  }],
+  disambiguation: {
+    type: String
+  },
+  slug: {
+    type: String,
+    required: true
+  },
+  last_updated: {
+    type: Date,
+    default: Date.now
+  },
+}, {
+  collection: "area",
+  strict: false
+});
 
-module.exports = mongoose.model('area', areaSchema);
-//module.exports.AreaType = mongoose.model('AreaType', areaTypeSchema);
-//module.exports.AreaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);
+if (mongoose.models.area) {
+  module.exports = mongoose.models.area;
+} else {
+  module.exports = mongoose.model('area', areaSchema);
+}
+//module.exports.areaType = mongoose.model('AreaType', areaTypeSchema);
+//module.exports.areaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);

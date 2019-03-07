@@ -11,7 +11,7 @@ module.exports = buildSchema(`
 
   type Area {
     _id: ID!
-    mbid: String!
+    id: String!
     name: String!
     disambiguation: String
     type: String
@@ -29,6 +29,41 @@ module.exports = buildSchema(`
     name: String!
     disambiguation: String
     type: String
+    images: [ArtistImage]
+    releases: [Release]
+    similar_artists: [Artist]
+  }
+
+  type Label {
+    _id: ID!
+    id: String!
+    name: String!
+    disambiguation: String
+    type: String
+    country: String
+  }
+
+  type ArtistImage {
+    url: String
+    size: String
+  }
+
+  type ReleaseGroup {
+    _id: ID!
+    id: String!
+    title: String!
+    releases: [Release]
+    primary_type: String
+  }
+
+  type Release {
+    _id: ID!
+    id: String!
+    title: String!
+    coverart_url: String
+    country: String
+    disambiguation: String
+    status: String
   }
 
   input LifeSpanInput {
@@ -38,7 +73,7 @@ module.exports = buildSchema(`
   }
 
   input AreaInput {
-    mbid: String!
+    id: String!
     name: String!
     disambiguation: String
     type: String!
@@ -50,13 +85,18 @@ module.exports = buildSchema(`
 
   type Query {
     getAreas(limit: Int, offset: Int) : [Area]
-    getArea(mbid: String!) : Area
+    getArea(id: String!) : Area
+    getLabels(limit: Int, offset: Int) : [Label]
+    getLabel(id: String!) : Label
     getArtists(limit: Int, offset: Int) : [Artist]
+    getReleases(limit: Int, offset: Int) : [Release]
+    getReleaseGroups(limit: Int, offset: Int) : [ReleaseGroup]
   }
 
   type Mutation {
     createArea(area: AreaInput!): Area
     updateArea(area: AreaInput!): Area
-    deleteArea(mbid: Int!): Boolean
+    deleteArea(id: Int!): Boolean
   }
-`);
+
+  `);

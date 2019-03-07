@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 
-const artistSchema = new Schema({
+const labelSchema = new Schema({
   type: {
     type: String
   },
@@ -79,18 +79,25 @@ const artistSchema = new Schema({
   disambiguation: {
     type: String
   },
-  images: {
-    type: [],
+  isnis: {
+    type: [String]
+  },
+  ipis: {
+    type: [String]
+  },
+  country: {
+    type: String
+  },
+  label_code: {
+    type: String,
     required: false
   },
+  /*
   releases: {
     type: [{}],
     required: true
   },
-  similar_artists: {
-    type: [],
-    required: false
-  },
+  */
   slug: {
     type: String,
     required: true
@@ -100,14 +107,12 @@ const artistSchema = new Schema({
     default: Date.now
   },
 }, {
-  collection: "artist",
+  collection: "label",
   strict: false
 });
 
-if (mongoose.models.artist) {
-  module.exports = mongoose.models.artist;
+if (mongoose.models.label) {
+  module.exports = mongoose.models.label;
 } else {
-  module.exports = mongoose.model('artist', artistSchema);
+  module.exports = mongoose.model('label', labelSchema);
 }
-//module.exports.areaType = mongoose.model('AreaType', areaTypeSchema);
-//module.exports.areaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);

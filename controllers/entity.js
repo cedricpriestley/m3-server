@@ -1,7 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
-//const Area = require('../models/area');
-//const Artist = require('../models/artist');
+const Area = require('../models/area');
+const Artist = require('../models/artist');
+const Label = require('../models/label');
+const Release = require('../models/release');
+const ReleaseGroup = require('../models/release-group');
 const slugify = require('slugify');
 const Enum = require('../sandbox/enums');
 const config = require('config');
@@ -19,7 +22,7 @@ const autoImportForeignEntities = config.get('general.import.autoImportRelations
 
 const app = express();
 
-
+/*
 const entities = ['area', 'artist'];
 const Entities = [];
 for (entity of entities) {
@@ -41,12 +44,12 @@ for (entity of entities) {
     Entities[entity] = mongoose.model(entity, entitySchema);
   }
 }
-
+*/
 exports.getEntity = (req, res, next) => {
   const id = req.params.id;
   const type = req.params.type;
   console.log('/api/:type/:id', id, type);
-  _getEntity(id, type, entity => {
+  _getEntity(id, type, true, entity => {
     return res.send(entity);
   });
 };
@@ -69,20 +72,26 @@ exports.importEntity = (req, res, next) => {
   const type = req.params['type'];
   console.log('/api/:type/import/:id', id, type);
   //_getEntity(id, type, entity => {
-  _getEntity(id, type)
+  _getEntity(id, type, false, () => {
+      ;
+    })
     .then(entity => {
       return entity;
     })
     .then(entity => {
       if (!entity) {
         console.log(`  ${type} ${id} not found`);
-        _insertEntity(id, type, result => {
+        _insertEntity(id, type, (result, ent) => {
           console.log(`  ${type} ${id} insert`);
-          _getEntity(id, type, entity => {
+          _getEntity(id, type, false, entity => {
             if (entity) {
               console.log(`  ${type} ${id} found`);
             } else {
               console.log(`${type} ${id} not found`);
+            }
+
+            if (autoImportForeignEntities) {
+              _importForeignEntities(entity, type, (result) => {});
             }
             res.send(entity);
           });
@@ -90,10 +99,13 @@ exports.importEntity = (req, res, next) => {
       } else {
         _resetEntity(entity, type, (result) => {
           console.log(`  ${type} ${id} resetted`);
-          _updateEntity(entity.id, type, (result) => {
+          _updateEntity(entity.id, type, (result, ent) => {
             console.log(`  ${type} ${id} updated`);
-            _getEntity(id, type, (entity) => {
+            _getEntity(id, type, false, (entity) => {
               console.log(`  ${type} ${id} found`);
+              if (autoImportForeignEntities) {
+                _importForeignEntities(ent, type, (result) => {});
+              }
               res.send(entity)
             });
           });
@@ -107,7 +119,7 @@ exports.resetEntity = (req, res, next) => {
   const type = req.params['type'];
   console.log('/api/:type/reset/:id', id, type);
 
-  _getEntity(id, type, (entity) => {
+  _getEntity(id, type, false, (entity) => {
     if (entity) {
       _resetEntity(entity, type, (results) => {});
     }
@@ -134,7 +146,7 @@ exports.getEntityCount = (req, res, next) => {
 
 var _getNextId = (type, callback) => {
 
-  Entities[type.replace('-', '_')]
+  _getEntityModel3(type)
     .find()
     .sort({
       _id: -1
@@ -158,10 +170,18 @@ var _updateLastFMArtist = (id) => {
         let document = {};
         document['images'] = [];
         let artist = results['body']['artist'];
+
+        if (artist['image']) {
+          //document['images'] = artist['image'];
+        }
+
         for (const image of artist['image']) {
-          if (image['size'] === 'mega') {
-            document['images'].push(image['#text']);
-          }
+          //if (image['size'] === 'mega') {
+          document['images'].push({
+            url: image['#text'],
+            size: image['size']
+          });
+          //}
         }
 
         let similarArtists = [];
@@ -180,37 +200,27 @@ var _updateLastFMArtist = (id) => {
             if (!simArtist || !simArtist['mbid']) continue;
             let name = simArtist['name'];
             let mbid = simArtist['mbid'];
-            let imageUrl = '';
+            let simImages = [];
             for (const image of simArtist['image']) {
-              if (image['size'] === 'mega') {
-                imageUrl = image['#text'];
-              }
+              simImages.push({
+                url: image['#text'],
+                size: image['size']
+              });
+              //   if (image['size'] === 'mega') {
+              //     imageUrl = image['#text'];
+              //   }
             }
             document['similar_artists'].push({
               name: name,
-              image_url: imageUrl,
+              images: simImages,
               id: mbid
             });
           }
-          //document['last_updated'] = new Date();
 
-          entitySchema = Entities[type.replace('-', '_')].Schema;
-          entitySchema.options.collection = 'artist';
+          document['last_updated'] = new Date();
 
-          entitySchema.add({
-            images: {
-              type: [],
-              required: false
-            }
-          });
-          entitySchema.add({
-            similar_artists: {
-              type: [],
-              required: false
-            }
-          });
-
-          Entities[type.replace('-', '_')].updateOne({
+          _getEntityModel3('artist')
+            .updateOne({
               id: id
             }, {
               $set: {
@@ -232,16 +242,16 @@ var _updateLastFMArtist = (id) => {
     });
 };
 
-var _getEntity = (id, type, callback) => {
+var _getEntity = (id, type, autoImport = false, callback) => {
   return Promise.try(function () {
-    console.log(type);
-    Entities[type.replace('-', '_')].findOne({
+    _getEntityModel3(type.replace('-', '_'))
+      .findOne({
         id: id
       })
       .then(entity => {
-        if (!entity) {
-          _insertEntity(id, type, result => {
-            _getEntity(id, type, entity => {
+        if (!entity && autoImport) {
+          _insertEntity(id, type, (result, ent) => {
+            _getEntity(id, type, false, entity => {
               switch (type) {
                 case 'artist':
                   _updateLastFMArtist(id, result => {});
@@ -249,6 +259,9 @@ var _getEntity = (id, type, callback) => {
                   break;
                 default:
                   break;
+              }
+              if (autoImportForeignEntities) {
+                _importForeignEntities(entity, type, (result) => {});
               }
             });
           });
@@ -291,9 +304,8 @@ var _searchLastFMArtist = (similarArtists) => {
 }
 
 var _getEntityCount = (type, callback) => {
-  callback(4);
-  return;
-  Entities[type.replace('-', '_')]
+
+  _getEntityModel3(type.replace("-", "_"))
     .countDocuments()
     .then(result => {
       callback(result);
@@ -307,57 +319,93 @@ var _getEntityCount = (type, callback) => {
 var _insertEntity = (id, type, callback) => {
   var options = _buildEntityLookupUrl(id, type);
 
-  request(options, (err, res, entity) => {
+  request(options)
+    .then(entity => {
 
-    if (err) {
-      return console.log(err);
-    }
+      let document = {};
+      for (const key in entity.body) {
+        document[key.replace('-', '_')] = entity.body[key];
+      }
 
-    let document = {};
-    for (const key in entity) {
-      document[key.replace('-', '_')] = entity[key];
-    }
+      let slug = ((entity.body.name) ? entity.body.name : entity.body.title) + ((entity.body.disambiguation) ?
+        '-' + (entity.body.disambiguation) : '').replace(/\//g, '-');
 
-    let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation) ?
-      '-' + (entity.disambiguation) : '').replace(/\//g, '-');
+      document['slug'] = type + "/" +
+        slugify(slug, {
+          remove: /[*+~.()\'"!:@]/g
+        }).toLowerCase();
 
-    document['slug'] = type + "/" +
-      slugify(slug, {
-        remove: /[*+~.()\'"!:@]/g
-      }).toLowerCase();
+      document['last_updated'] = new Date();
 
-    document['last_updated'] = new Date();
+      if (type === 'release') {
+        //var coverArtUrl = _getReleaseCoverArt(id)
+        //document['coverart_url'] = coverArtUrl;
 
-    if (type === 'release') {
-      _getReleaseCoverArt(id)
-        .then(url => {
-          document['coverart_url'] = url;
+
+        let coverArtUrl = `http://coverartarchive.org/release/${id}`;
+        var options = {
+          url: coverArtUrl,
+          headers: {
+            'User-Agent': 'm3 server 100.115.92.202'
+          },
+          json: true
+        };
+        request(options)
+          .then(results => {
+            if (!results.body.images) {
+              return document;
+            }
+            for (const image of results.body.images) {
+              if (image['front'] === true) {
+                document['coverart_url'] = image['image'];
+                //return image['image'];
+              }
+            }
+            return document;
+          })
+          .then(document => {
+            Entity = _getEntityModel3(type.replace('-', '_'));
+            ent = new Entity(document);
+            ent
+              .save()
+              .then(result => {
+                callback(result, entity);
+              })
+              .then(results => {})
+              .catch(err => {
+                console.log(err);
+                callback(err);
+                return;
+              });
+          })
+          .catch(err => {
+            console.log(err);
+          })
+      } else {
+        return document;
+      }
+    })
+    .then(document => {
+      Entity = _getEntityModel3(type.replace('-', '_'));
+      ent = new Entity(document);
+      ent
+        .save()
+        .then(result => {
+          callback(result, document);
         })
+        .then(results => {})
         .catch(err => {
           console.log(err);
+          callback(err);
         });
-    }
-
-    entity = new Entities[type.replace('-', '_')](document);
-    entity
-      .save()
-      .then(result => {
-
-        if (autoImportForeignEntities) {
-          _importForeignEntities(entity, type, (result) => {});
-        }
-        callback(result);
-      })
-      .then(results => {})
-      .catch(err => {
-        console.log(err);
-        callback(err);
-      });
-    //});
-  });
+      //});
+    })
+    .catch(err => {
+      console.log(err);
+    });
 }
 
-var _getReleaseCoverArt = async (id, callback) => {
+var _getReleaseCoverArt = async (id) => {
   let coverArtUrl = `http://coverartarchive.org/release/${id}`;
   var options = {
     url: coverArtUrl,
@@ -371,7 +419,7 @@ var _getReleaseCoverArt = async (id, callback) => {
       for (const image of results.body.images) {
         if (image['front'] === true) {
           //document['coverart_url'] = image['image'];
-          callback(image['image']);
+          return image['image'];
         }
       }
     })
@@ -405,15 +453,12 @@ var _updateEntity = (id, type, callback) => {
 
     document['last_updated'] = new Date();
 
-    Entities[type.replace("-", "_")]
+    _getEntityModel3(type.replace("-", "_"))
       .updateOne({
         id: id
       }, document)
       .then(result => {
-        if (autoImportForeignEntities) {
-          _importForeignEntities(entity, type, (foreignResult) => {});
-        }
-        callback(result);
+        callback(result, entity);
       })
       .catch(err => {
         console.log(err);
@@ -434,13 +479,14 @@ var _resetEntity = (document, type, callback) => {
     }
   }
 
-  Entities[type.replace('-', '_')].updateOne({
-    id: document['id']
-  }, {
-    $unset: unsetValues
-  }, (err, result) => {
-    callback();
-  });
+  _getEntityModel3(entityType)
+    .updateOne({
+      id: document['id']
+    }, {
+      $unset: unsetValues
+    }, (err, result) => {
+      callback();
+    });
 }
 
 var _importForeignEntities = (doc, type, callback) => {
@@ -453,15 +499,20 @@ var _importForeignEntities = (doc, type, callback) => {
     let foreignType = Object.values(foreignEntity)[0];
     if (Object.prototype.hasOwnProperty.call(doc, key)) {
       if (doc[key]) {
-        let id = doc[key]['id'];
-        _getEntity(id, foreignType, (entity) => {
+        let id;
+        if (type == 'release' && key == 'label_info') {
+          id = doc[key][0]['label']['id'];
+        } else {
+          id = doc[key]['id'];
+        }
+        _getEntity(id, foreignType, false, (entity) => {
           if (!entity) {
             _insertEntity(id, foreignType, (result) => {
               callback(result);
             });
           } else {
             _resetEntity(entity, foreignType, () => {
-              _updateEntity(entity.id, foreignType, (result) => {
+              _updateEntity(entity.id, foreignType, (result, entity) => {
                 switch (type) {
                   case 'artist':
                     //_updateLastFMArtistData(id, type, result => {
@@ -496,16 +547,24 @@ var _getEntityModel3 = (type) => {
 
   switch (type) {
     case "area":
-      //return Area;
+      return Area;
+    case "artist":
+      return Artist;
+      case "label":
+      return Label;
+    case "release":
+      return Release;
+    case "release_group":
+      return ReleaseGroup;
     default:
       throw new Error('Entity model not found.');
   }
 }
 
 var _browseEntities = (type, offset, count, callback) => {
-  callback([]);
-  return;
-  Entities[type.replace('-', '_')].find({
+
+  _getEntityModel3(type.replace("-", "_"))
+    .find({
       "name": {
         $ne: null
       }
@@ -524,15 +583,16 @@ var searchArtist = (term, callback) => {
 
   term = '"' + term + '"';
 
-  Entities[type.replace('-', '_')].find({
-    $text: {
-      $search: term,
-      $caseSensitive: false
-    }
-  }).toArray((err, documents) => {
-    //assert.equal(err, null);
-    callback(documents);
-  });
+  _getEntityModel3('artist'.replace("-", "_"))
+    .find({
+      $text: {
+        $search: term,
+        $caseSensitive: false
+      }
+    }).toArray((err, documents) => {
+      //assert.equal(err, null);
+      callback(documents);
+    });
 }
 
 var _buildLastFMSearchUrl = (name, type) => {
@@ -564,8 +624,12 @@ var _buildLastFMLookupUrl = (mbid, type) => {
 
 function _buildEntityLookupUrl(id, type) {
   let incs = getEntityIncludes(type).join("+");
-  const mburl = `https://musicbrainz.org/ws/2/${type}/${id}?inc=${incs}&fmt=json`;
-  //console.log(mburl);
+  let subs = getEntitySubqueries(type).join("+");
+  let subIncs = getEntitySubqueryIncludes(type).join("+");
+  let relIncs = getRelIncludes(type).join("+");
+
+  const mburl = `https://musicbrainz.org/ws/2/${type}/${id}?inc=${incs}+${relIncs}+${subs}+${subIncs}&fmt=json`;
+  console.log(mburl);
   var options = {
     url: mburl,
     headers: {
@@ -578,10 +642,30 @@ function _buildEntityLookupUrl(id, type) {
 }
 
 /*
-"area-rels", "artist-rels", "event-rels",
+$relIncs = ["area-rels", "artist-rels", "event-rels",
 "label-rels", "place-rels", "recording-rels", "release-group-rels",
-"release-rels", "series-rels", "url-rels", "work-rels"
+"release-rels", "series-rels", "url-rels", "work-rels"]
 */
+const getRelIncludes = type => {
+  switch (type) {
+    case "area":
+    case "artist":
+    case "label":
+    case "place":
+    case "recording":
+    case "release":
+    case "release-group":
+    case "series":
+    case "url":
+      return ["area-rels", "artist-rels", "event-rels",
+        "label-rels", "place-rels", "recording-rels", "release-group-rels",
+        "release-rels", "series-rels", "url-rels", "work-rels"
+      ];
+    default:
+      return [];
+  }
+}
+
 const getEntityIncludes = type => {
   switch (type) {
     case "area":
@@ -624,14 +708,16 @@ const getForeignEntities = type => {
     case "place":
     case "recording":
     case "release":
-      return ["artist-credits"];
+      return [{
+        "label_info": "label"
+      }];
     case "release-group":
       return ["artist-credits"];
     case "series":
     case "url":
       return [];
     default:
-      break;
+      return [];
   }
 }
 
@@ -644,11 +730,11 @@ const getEntitySubqueries = type => {
     case "recording":
       return ["artists", "releases"];
     case "release":
-      return ["artists", "collections", "labels", "recordings", "release-groups"];
+      return ["artists", "isrcs", "labels", "recordings", "release-groups"];
     case "release-group":
       return ["artists", "releases"];
     default:
-      break;
+      return [];
   }
 }
 
@@ -656,11 +742,9 @@ const getEntitySubqueryIncludes = type => {
   switch (type) {
     case "recordings":
       return ["artist-credits", "isrcs"];
-    case "releases":
-      return ["artist-credits", "discids", "media"];
-    case "release-groups":
-      return ["artists", "releases"];
+    case "release":
+      return ["artist-credits", "media"];
     default:
-      break;
+      return [];
   }
 }
