@@ -712,7 +712,7 @@ const getForeignEntities = type => {
         "label_info": "label"
       }];
     case "release-group":
-      return ["artist-credits"];
+      return [];//["artist-credits"];
     case "series":
     case "url":
       return [];
@@ -724,7 +724,7 @@ const getForeignEntities = type => {
 const getEntitySubqueries = type => {
   switch (type) {
     case "artist":
-      return ["recordings", "releases", "release-groups", "works"];
+      return ["media", "recordings", "releases", "release-groups", "works"];
     case "label":
       return ["releases"];
     case "recording":
@@ -732,7 +732,7 @@ const getEntitySubqueries = type => {
     case "release":
       return ["artists", "isrcs", "labels", "recordings", "release-groups"];
     case "release-group":
-      return ["artists", "releases"];
+      return ["artists", "media", "releases"];
     default:
       return [];
   }
