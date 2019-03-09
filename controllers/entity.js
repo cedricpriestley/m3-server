@@ -274,6 +274,45 @@ var _getEntity = (id, type, autoImport = false, callback) => {
   });
 }
 
+var _getReleaseGroups = (id, offset) => {
+  return Promise.try(function () {
+    //similarArtists.reverse();
+    let url = `https://musicbrainz.org/ws/2/release-group?artist=${id}&offset=${offset}&limit=100&type=album|ep|single&fmt=json`;
+    var options = {
+      url: url,
+      headers: {
+        'User-Agent': 'm3 server 100.115.92.202'
+      },
+      json: true
+    }
+    return request(options);
+  }).then(function (response) {
+    let total = 0;
+    if (response.body['release-group-count']) {
+      total = response.body['release-group-count'];
+    }
+    offset = offset + 100;
+    if (offset < total) {
+      return Promise.try(function () {
+        return _getReleaseGroups(id, offset);
+      }).then(function (recursiveResults) {
+        if (response.body['release-groups']) {
+          return [response.body['release-groups']].concat(recursiveResults);
+        } else {
+          return recursiveResults;
+        }
+      });
+    } else {
+      // Done looping
+      if (response.body['release-groups']) {
+        return [response.body['release-groups']];
+      } else {
+        return [response.body['release-groups']];
+      }
+    }
+  });
+};
+
 var _searchLastFMArtist = (similarArtists) => {
   return Promise.try(function () {
     //similarArtists.reverse();
@@ -336,7 +375,45 @@ var _insertEntity = (id, type, callback) => {
         }).toLowerCase();
 
       document['last_updated'] = new Date();
-
+      return document;
+    })
+    .then(document => {
+      if (type === 'artist') {
+        Promise.try(function () {
+            //if (artist['similar']['artist'].length == 0) return [];
+            return _getReleaseGroups(id, 0);
+          }).then(function (results) {
+            let releaseGroups = [];
+            for (let result of results) {
+              for (let releaseGroup of result) {
+                releaseGroups.push(releaseGroup);
+              }
+            }
+            document['release_groups'] = releaseGroups;
+            return document;
+          })
+          .then(document => {
+            Entity = _getEntityModel3(type.replace('-', '_'));
+            ent = new Entity(document);
+            ent
+              .save()
+              .then(result => {
+                callback(result, document);
+              })
+              .then(results => {})
+              .catch(err => {
+                console.log(err);
+                callback(err);
+                return;
+              });
+          })
+          .catch(err => {
+            console.log(err);
+          });
+      }
+      return document;
+    })
+    .then(document => {
       if (type === 'release') {
         //var coverArtUrl = _getReleaseCoverArt(id)
         //document['coverart_url'] = coverArtUrl;
@@ -358,10 +435,9 @@ var _insertEntity = (id, type, callback) => {
             for (const image of results.body.images) {
               if (image['front'] === true) {
                 document['coverart_url'] = image['image'];
-                //return image['image'];
+                return document;
               }
             }
-            return document;
           })
           .then(document => {
             Entity = _getEntityModel3(type.replace('-', '_'));
@@ -369,7 +445,7 @@ var _insertEntity = (id, type, callback) => {
             ent
               .save()
               .then(result => {
-                callback(result, entity);
+                callback(result, document);
               })
               .then(results => {})
               .catch(err => {
@@ -380,25 +456,26 @@ var _insertEntity = (id, type, callback) => {
           })
           .catch(err => {
             console.log(err);
-          })
-      } else {
-        return document;
+          });
       }
+      return document;
     })
     .then(document => {
-      Entity = _getEntityModel3(type.replace('-', '_'));
-      ent = new Entity(document);
-      ent
-        .save()
-        .then(result => {
-          callback(result, document);
-        })
-        .then(results => {})
-        .catch(err => {
-          console.log(err);
-          callback(err);
-        });
-      //});
+      if (type != 'release' && type != 'artist') {
+        Entity = _getEntityModel3(type.replace('-', '_'));
+        ent = new Entity(document);
+        ent
+          .save()
+          .then(result => {
+            callback(result, document);
+          })
+          .then(results => {})
+          .catch(err => {
+            console.log(err);
+            callback(err);
+            return;
+          });
+      }
     })
     .catch(err => {
       console.log(err);
@@ -497,13 +574,13 @@ var _importForeignEntities = (doc, type, callback) => {
 
     let key = Object.keys(foreignEntity)[0];
     let foreignType = Object.values(foreignEntity)[0];
-    if (Object.prototype.hasOwnProperty.call(doc, key)) {
-      if (doc[key]) {
+    if (Object.prototype.hasOwnProperty.call(doc._doc, key)) {
+      if (doc._doc[key]) {
         let id;
         if (type == 'release' && key == 'label_info') {
-          id = doc[key][0]['label']['id'];
+          id = doc._doc[key][0]['label']['id'];
         } else {
-          id = doc[key]['id'];
+          id = doc._doc[key]['id'];
         }
         _getEntity(id, foreignType, false, (entity) => {
           if (!entity) {
@@ -550,7 +627,7 @@ var _getEntityModel3 = (type) => {
       return Area;
     case "artist":
       return Artist;
-      case "label":
+    case "label":
       return Label;
     case "release":
       return Release;
@@ -649,6 +726,7 @@ $relIncs = ["area-rels", "artist-rels", "event-rels",
 const getRelIncludes = type => {
   switch (type) {
     case "area":
+      return ["area-rels"];
     case "artist":
     case "label":
     case "place":
@@ -712,7 +790,7 @@ const getForeignEntities = type => {
         "label_info": "label"
       }];
     case "release-group":
-      return [];//["artist-credits"];
+      return []; //["artist-credits"];
     case "series":
     case "url":
       return [];
@@ -724,6 +802,7 @@ const getForeignEntities = type => {
 const getEntitySubqueries = type => {
   switch (type) {
     case "artist":
+      return [];
       return ["media", "recordings", "releases", "release-groups", "works"];
     case "label":
       return ["releases"];

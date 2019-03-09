@@ -10,9 +10,6 @@ const artistSchema = new Schema({
     type: String
   },
   tags: [{
-    _id: {
-      require: false
-    },
     name: {
       type: String,
       required: true

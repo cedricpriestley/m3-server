@@ -8,7 +8,7 @@ const Release = require('./models/release');
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const validator = require('validator');
+//const validator = require('validator');
 
 let entitySchema = new Schema({
   id: {
