@@ -1,4 +1,4 @@
-db.area.createIndex( { "id": 1 }, { unique: true } )
-db.artist.createIndex( { "id": 1 }, { unique: true } )
-db.release_group.createIndex( { "id": 1 }, { unique: true } )
-db.release.createIndex( { "id": 1 }, { unique: true } )
+db.area.createIndex( { "mbid": 1 }, { unique: true } )
+db.artist.createIndex( { "mbid": 1 }, { unique: true } )
+db.release_group.createIndex( { "mbid": 1 }, { unique: true } )
+db.release.createIndex( { "mbid": 1 }, { unique: true } )

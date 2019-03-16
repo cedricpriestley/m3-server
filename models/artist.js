@@ -2,100 +2,430 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 
-const artistSchema = new Schema({
-  type: {
-    type: String
-  },
-  type_id: {
-    type: String
-  },
-  tags: [{
-    name: {
-      type: String,
-      required: true
-    },
-    count: {
-      type: Number,
-      required: false
+const partOfArea = {
+  areas: {
+    nodes: {
+      target: {
+        mbid: {
+          type: String
+        },
+        name: {
+          type: String
+        }
+      }
     }
-  }],
-  id: {
+  }
+};
+const artistSchema = new Schema({
+  mbid: {
     type: String,
     required: true
-  },
-  sort_name: {
-    type: String
   },
   name: {
     type: String,
     required: true
   },
-  life_span: {
-    ended: {
-      type: Boolean
+  slug: {
+    type: String,
+    required: true
+  },
+  sortName: {
+    type: String,
+  },
+  disambiguation: {
+    type: String,
+  },
+  country: {
+    type: String,
+  },
+  type: {
+    type: String,
+  },
+  typeID: {
+    type: String,
+  },
+  rating: {
+    voteCount: {
+      type: Number
     },
+    value: {
+      type: String
+    }
+  },
+  gender: {
+    type: String,
+  },
+  genderID: {
+    type: String,
+  },
+  lifeSpan: {
     begin: {
       type: String
     },
     end: {
       type: String
+    },
+    ended: {
+      type: Boolean
     }
   },
+  tags: {
+    tags: [{
+      name: {
+        type: String
+      },
+      count: {
+        type: Number
+      }
+    }]
+  },
   aliases: [{
-    _id: {
-      require: false
-    },
-    begin: {
+    name: {
       type: String
     },
     type: {
       type: String
-    },
-    locale: {
-      type: String
-    },
-    type_id: {
-      type: String
-    },
-    sortName: {
+    }
+  }],
+  area: {
+    mbid: {
       type: String
     },
     name: {
       type: String
     },
-    end: {
+    sortName: {
       type: String
     },
-    primary: {
-      type: Boolean
+    disambiguation: {
+      type: String
     },
-    ended: {
-      type: Boolean
+    partOfArea: {
+      areas: {
+        nodes: [{
+          target: {
+            mbid: {
+              type: String
+            },
+            name: {
+              type: String
+            },
+            partOfArea: {
+              areas: {
+                nodes: [{
+                  target: {
+                    mbid: {
+                      type: String
+                    },
+                    name: {
+                      type: String
+                    },
+                    partOfArea: {
+                      areas: {
+                        nodes: [{
+                          target: {
+                            mbid: {
+                              type: String
+                            },
+                            name: {
+                              type: String
+                            },
+                            partOfArea: {
+                              areas: {
+                                nodes: [{
+                                  target: {
+                                    mbid: {
+                                      type: String
+                                    },
+                                    name: {
+                                      type: String
+                                    }
+                                  }
+                                }]
+                              }
+                            }
+                          }
+                        }]
+                      }
+                    }
+                  }
+                }]
+              }
+            }
+          }
+        }]
+      }
     }
-  }],
-  disambiguation: {
-    type: String
   },
-  images: {
-    type: [],
-    required: false
+  beginArea: {
+    mbid: {
+      type: String
+    },
+    name: {
+      type: String
+    },
+    sortName: {
+      type: String
+    },
+    disambiguation: {
+      type: String
+    }
   },
-  releases: {
-    type: [{}],
-    required: true
+  endArea: {
+    mbid: {
+      type: String
+    },
+    name: {
+      type: String
+    },
+    sortName: {
+      type: String
+    },
+    disambiguation: {
+      type: String
+    }
   },
-  similar_artists: {
-    type: [],
-    required: false
+  relationships: {
+    artists: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          name: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    labels: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          name: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    places: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          name: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    recordings: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          title: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    releases: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          title: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    releaseGroups: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          title: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    series: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          title: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    works: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          name: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
+    urls: {
+      nodes: [{
+        type: {
+          type: String
+        },
+        targetType: String,
+        direction: String,
+        begin: String,
+        end: String,
+        ended: Boolean,
+        targetCredit: String,
+        sourceCredit: String,
+        target: {
+          mbid: String,
+          resource: String
+        },
+        attributes: {
+          type: [String]
+        }
+      }]
+    },
   },
-  slug: {
+  lastUpdated: {
     type: String,
     required: true
   },
-  last_updated: {
-    type: Date,
-    default: Date.now
-  },
+  lastFM: {
+    url: {
+      type: String
+    },
+    smallImage: {
+      type: String
+    },
+    mediumImage: {
+      type: String
+    },
+    largeImage: {
+      type: String
+    },
+    extraLargeImage: {
+      type: String
+    },
+    megaImage: {
+      type: String
+    },
+    similarArtists: {
+      similarArtists: [{
+        mbid: {
+          type: String
+        },
+        name: {
+          type: String
+        },
+        image: {
+          type: String
+        }
+      }]
+    },
+    biography: {
+      summaryHTML: String
+    },
+    tags: {
+      tags: [{
+        name: {
+          type: String
+        },
+        url: {
+          type: String
+        }
+      }]
+    }
+  }
 }, {
   collection: "artist",
   strict: false
@@ -106,5 +436,3 @@ if (mongoose.models.artist) {
 } else {
   module.exports = mongoose.model('artist', artistSchema);
 }
-//module.exports.areaType = mongoose.model('AreaType', areaTypeSchema);
-//module.exports.areaAliasType = mongoose.model('AreaAliasType', areaAliasTypeSchema);

@@ -9,67 +9,14 @@ const areaSchema = new Schema({
   type_id: {
     type: String
   },
-  tags: [{
-    name: {
-      type: String,
-      required: true
-    },
-    count: {
-      type: Number,
-      required: false
-    }
-  }],
-  id: {
+  mbid: {
     type: String,
     required: true
-  },
-  sort_name: {
-    type: String
   },
   name: {
     type: String,
     required: true
   },
-  life_span: {
-    ended: {
-      type: Boolean
-    },
-    begin: {
-      type: String
-    },
-    end: {
-      type: String
-    }
-  },
-  aliases: [{
-    begin: {
-      type: String
-    },
-    type: {
-      type: String
-    },
-    locale: {
-      type: String
-    },
-    type_id: {
-      type: String
-    },
-    sortName: {
-      type: String
-    },
-    name: {
-      type: String
-    },
-    end: {
-      type: String
-    },
-    primary: {
-      type: Boolean
-    },
-    ended: {
-      type: Boolean
-    }
-  }],
   disambiguation: {
     type: String
   },
@@ -77,7 +24,7 @@ const areaSchema = new Schema({
     type: String,
     required: true
   },
-  last_updated: {
+  lastUpdated: {
     type: Date,
     default: Date.now
   },

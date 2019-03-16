@@ -91,7 +91,7 @@ exports.importEntity = (req, res, next) => {
             }
 
             if (autoImportForeignEntities) {
-              _importForeignEntities(entity, type, (result) => {});
+              //_importForeignEntities(entity, type, (result) => {});
             }
             res.send(entity);
           });
@@ -104,7 +104,7 @@ exports.importEntity = (req, res, next) => {
             _getEntity(id, type, false, (entity) => {
               console.log(`  ${type} ${id} found`);
               if (autoImportForeignEntities) {
-                _importForeignEntities(ent, type, (result) => {});
+                //_importForeignEntities(ent, type, (result) => {});
               }
               res.send(entity)
             });
@@ -217,7 +217,7 @@ var _updateLastFMArtist = (id) => {
             });
           }
 
-          document['last_updated'] = new Date();
+          document['lastUpdated'] = new Date();
 
           _getEntityModel3('artist')
             .updateOne({
@@ -246,7 +246,7 @@ var _getEntity = (id, type, autoImport = false, callback) => {
   return Promise.try(function () {
     _getEntityModel3(type.replace('-', '_'))
       .findOne({
-        id: id
+        mbid: id
       })
       .then(entity => {
         if (!entity && autoImport) {
@@ -254,7 +254,7 @@ var _getEntity = (id, type, autoImport = false, callback) => {
             _getEntity(id, type, false, entity => {
               switch (type) {
                 case 'artist':
-                  _updateLastFMArtist(id, result => {});
+                  //_updateLastFMArtist(id, result => {});
                 case 'release':
                   break;
                 default:
@@ -263,6 +263,7 @@ var _getEntity = (id, type, autoImport = false, callback) => {
               if (autoImportForeignEntities) {
                 _importForeignEntities(entity, type, (result) => {});
               }
+              callback(entity);
             });
           });
         }
@@ -355,34 +356,37 @@ var _getEntityCount = (type, callback) => {
     });
 }
 
-var _insertEntity = (id, type, callback) => {
+var _insertEntity = async (id, type, callback) => {
   var options = _buildEntityLookupUrl(id, type);
 
-  request(options)
-    .then(entity => {
+  await request(options)
+    .then(result => {
 
       let document = {};
-      for (const key in entity.body) {
-        document[key.replace('-', '_')] = entity.body[key];
+      let entity = JSON.parse(result.body).data.result.entity;
+      for (const key in entity) {
+        document[key] = entity[key];
       }
 
-      let slug = ((entity.body.name) ? entity.body.name : entity.body.title) + ((entity.body.disambiguation) ?
-        '-' + (entity.body.disambiguation) : '').replace(/\//g, '-');
+      let slug = ((entity.name) ? entity.name : entity.title) + ((entity.disambiguation) ?
+        '-' + (entity.disambiguation) : '').replace(/\//g, '-');
 
       document['slug'] = type + "/" +
         slugify(slug, {
           remove: /[*+~.()\'"!:@]/g
         }).toLowerCase();
 
-      document['last_updated'] = new Date();
+      document['lastUpdated'] = new Date();
       return document;
     })
     .then(document => {
-      if (type === 'artist') {
+      if (type == 'artist') {
+
         Promise.try(function () {
             //if (artist['similar']['artist'].length == 0) return [];
             return _getReleaseGroups(id, 0);
           }).then(function (results) {
+            /*
             let releaseGroups = [];
             for (let result of results) {
               for (let releaseGroup of result) {
@@ -390,6 +394,7 @@ var _insertEntity = (id, type, callback) => {
               }
             }
             document['release_groups'] = releaseGroups;
+            */
             return document;
           })
           .then(document => {
@@ -528,7 +533,7 @@ var _updateEntity = (id, type, callback) => {
     //    updateValues['slug'] =
     //    slugify(slug, { remove: /[*+~.()\'"!:@]/g }).toLowerCase();
 
-    document['last_updated'] = new Date();
+    document['lastUpdated'] = new Date();
 
     _getEntityModel3(type.replace("-", "_"))
       .updateOne({
@@ -574,13 +579,14 @@ var _importForeignEntities = (doc, type, callback) => {
 
     let key = Object.keys(foreignEntity)[0];
     let foreignType = Object.values(foreignEntity)[0];
+
     if (Object.prototype.hasOwnProperty.call(doc._doc, key)) {
       if (doc._doc[key]) {
         let id;
         if (type == 'release' && key == 'label_info') {
-          id = doc._doc[key][0]['label']['id'];
+          id = doc._doc[key][0]['label']['mdid'];
         } else {
-          id = doc._doc[key]['id'];
+          id = doc._doc[key]['mbid'];
         }
         _getEntity(id, foreignType, false, (entity) => {
           if (!entity) {
@@ -699,21 +705,263 @@ var _buildLastFMLookupUrl = (mbid, type) => {
   return options;
 }
 
-function _buildEntityLookupUrl(id, type) {
-  let incs = getEntityIncludes(type).join("+");
-  let subs = getEntitySubqueries(type).join("+");
-  let subIncs = getEntitySubqueryIncludes(type).join("+");
-  let relIncs = getRelIncludes(type).join("+");
+var _buildEntityLookupUrl = (id, type) => {
+  //let incs = getEntityIncludes(type).join("+");
+  //let subs = getEntitySubqueries(type).join("+");
+  //let subIncs = getEntitySubqueryIncludes(type).join("+");
+  //let relIncs = getRelIncludes(type).join("+");
 
-  const mburl = `https://musicbrainz.org/ws/2/${type}/${id}?inc=${incs}+${relIncs}+${subs}+${subIncs}&fmt=json`;
-  console.log(mburl);
+  //let mburl = `https://musicbrainz.org/ws/2/${type}/${id}?inc=${incs}+${relIncs}+${subs}+${subIncs}&fmt=json`;
+  let body;
+  switch (type) {
+    case 'artist':
+      body = `
+    query {
+      result: lookup {
+        entity: artist(mbid: "${id}") {
+          name
+          mbid
+          sortName
+          disambiguation
+          country
+          type
+          typeID
+          rating {
+            voteCount
+            value
+          }
+          gender
+          genderID
+          lifeSpan {
+            begin
+            end
+            ended
+          }
+          area {
+            mbid
+            name
+          }
+          beginArea {
+            mbid
+            name
+          }
+          relationships {
+            artists {
+              nodes {
+                type
+                target {
+                  artist
+                  ... on Artist {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            events {
+              nodes {
+                type
+                target {
+                  ... on Event {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            instruments {
+              nodes {
+                type
+                target {
+                  ... on Instrument {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            labels {
+              nodes {
+                type
+                target {
+                  ... on Label {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            places {
+              nodes {
+                type
+                target {
+                  ... on Place {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            recordings {
+              nodes {
+                type
+                target {
+                  ... on Recording {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            releases {
+              nodes {
+                type
+                target {
+                  ... on Release {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            releaseGroups {
+              nodes {
+                type
+                target {
+                  ... on ReleaseGroup {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            series {
+              nodes {
+                type
+                target {
+                  ... on Series {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            works {
+              nodes {
+                type
+                target {
+                  ... on Work {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+            urls {
+              nodes {
+                type
+                target {
+                  ... on Url {
+                    mbid
+                    name
+                  }
+                }
+                attributes
+              }
+            }
+          }
+          endArea {
+            mbid
+            name
+          }
+          aliases {
+            name
+            type
+          }
+          tags {
+            tags: nodes {
+              name
+              count
+            }
+          }
+          lastFM {
+            image(size: MEGA)
+            similarArtists {
+              artists: nodes {
+                mbid
+                name
+                image(size: SMALL)
+              }
+            }
+            url
+            tags: topTags {
+              nodes {
+                name
+                url
+              }
+            }
+            biography {
+              summaryHTML
+            }
+          }
+          discogs {
+            members {
+              name
+            }
+            profile
+            images {
+              url
+              type
+            }
+            urls
+          }
+        }
+      }
+    }
+    `;
+      break;
+    case 'area':
+      body = `
+      query {
+        result: lookup {
+          entity: area(mbid: "${id}") {
+            mbid
+            name
+            sortName
+            disambiguation
+            type
+            typeID
+          }
+        }
+      }
+      `;
+      break;
+    default:
+      break;
+  }
+
+  let mburl = `http://localhost:3000/graphbrainz?query=${body}`;
   var options = {
     url: mburl,
     headers: {
       'User-Agent': 'm3 server 100.115.92.202'
     },
-    json: true
+    //json: true
   };
+
+  if (type === 'artist') {
+    //options['body'] = artistBody;
+  }
 
   return options;
 }
@@ -775,9 +1023,9 @@ const getForeignEntities = type => {
       return [{
         "area": "area"
       }, {
-        "begin_area": "area"
+        "beginArea": "area"
       }, {
-        "end_area": "area"
+        "endArea": "area"
       }];
     case "label":
     case "work":
