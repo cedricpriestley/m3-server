@@ -13,6 +13,7 @@
     "@jsonforms/examples": "^2.2.0",
     "@jsonforms/material-renderers": "^2.2.0",
     "amazon-product-api": "^0.4.4",
+    "apollo-server": "^2.4.8",
     "billboard-top-100": "^2.4.1",
     "bluebird": "^3.5.3",
     "config": "^3.0.1",

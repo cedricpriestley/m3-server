@@ -69,16 +69,14 @@ const artistSchema = new Schema({
       type: Boolean
     }
   },
-  tags: {
-    tags: [{
-      name: {
-        type: String
-      },
-      count: {
-        type: Number
-      }
-    }]
-  },
+  tags: [{
+    name: {
+      type: String
+    },
+    count: {
+      type: Number
+    }
+  }],
   aliases: [{
     name: {
       type: String
@@ -100,60 +98,28 @@ const artistSchema = new Schema({
     disambiguation: {
       type: String
     },
-    partOfArea: {
-      areas: {
-        nodes: [{
-          target: {
-            mbid: {
-              type: String
-            },
-            name: {
-              type: String
-            },
-            partOfArea: {
-              areas: {
-                nodes: [{
-                  target: {
-                    mbid: {
-                      type: String
-                    },
-                    name: {
-                      type: String
-                    },
-                    partOfArea: {
-                      areas: {
-                        nodes: [{
-                          target: {
-                            mbid: {
-                              type: String
-                            },
-                            name: {
-                              type: String
-                            },
-                            partOfArea: {
-                              areas: {
-                                nodes: [{
-                                  target: {
-                                    mbid: {
-                                      type: String
-                                    },
-                                    name: {
-                                      type: String
-                                    }
-                                  }
-                                }]
-                              }
-                            }
-                          }
-                        }]
-                      }
-                    }
-                  }
-                }]
-              }
-            }
+    area: {
+      mbid: {
+        type: String
+      },
+      name: {
+        type: String
+      },
+      area: {
+        mbid: {
+          type: String
+        },
+        name: {
+          type: String
+        },
+        area: {
+          mbid: {
+            type: String
+          },
+          name: {
+            type: String
           }
-        }]
+        }
       }
     }
   },
@@ -169,6 +135,30 @@ const artistSchema = new Schema({
     },
     disambiguation: {
       type: String
+    },
+    beginArea: {
+      mbid: {
+        type: String
+      },
+      beginArea: {
+        type: String
+      },
+      beginArea: {
+        mbid: {
+          type: String
+        },
+        name: {
+          type: String
+        },
+        beginArea: {
+          mbid: {
+            type: String
+          },
+          name: {
+            type: String
+          }
+        }
+      }
     }
   },
   endArea: {
@@ -183,15 +173,35 @@ const artistSchema = new Schema({
     },
     disambiguation: {
       type: String
+    },
+    endArea: {
+      mbid: {
+        type: String
+      },
+      endArea: {
+        type: String
+      },
+      endArea: {
+        mbid: {
+          type: String
+        },
+        name: {
+          type: String
+        },
+        endArea: {
+          mbid: {
+            type: String
+          },
+          name: {
+            type: String
+          }
+        }
+      }
     }
   },
   relationships: {
     artists: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
+      teacher: [{
         direction: String,
         begin: String,
         end: String,
@@ -206,175 +216,7 @@ const artistSchema = new Schema({
           type: [String]
         }
       }]
-    },
-    labels: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          name: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    places: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          name: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    recordings: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          title: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    releases: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          title: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    releaseGroups: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          title: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    series: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          title: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    works: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          name: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
-    urls: {
-      nodes: [{
-        type: {
-          type: String
-        },
-        targetType: String,
-        direction: String,
-        begin: String,
-        end: String,
-        ended: Boolean,
-        targetCredit: String,
-        sourceCredit: String,
-        target: {
-          mbid: String,
-          resource: String
-        },
-        attributes: {
-          type: [String]
-        }
-      }]
-    },
+    }
   },
   lastUpdated: {
     type: String,
@@ -399,37 +241,33 @@ const artistSchema = new Schema({
     megaImage: {
       type: String
     },
-    similarArtists: {
-      similarArtists: [{
-        mbid: {
-          type: String
-        },
-        name: {
-          type: String
-        },
-        image: {
-          type: String
-        }
-      }]
-    },
+    similarArtists: [{
+      mbid: {
+        type: String
+      },
+      name: {
+        type: String
+      },
+      image: {
+        type: String
+      }
+    }],
     biography: {
       summaryHTML: String
     },
-    tags: {
-      tags: [{
-        name: {
-          type: String
-        },
-        url: {
-          type: String
-        }
-      }]
-    }
+    topTags: [{
+      name: {
+        type: String
+      },
+      url: {
+        type: String
+      }
+    }]
   }
 }, {
-  collection: "artist",
-  strict: false
-});
+    collection: "artist",
+    strict: false
+  });
 
 if (mongoose.models.artist) {
   module.exports = mongoose.models.artist;

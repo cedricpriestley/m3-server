@@ -15,22 +15,14 @@ module.exports = buildSchema(`
     largeImage: String
     extraLargeImage: String
     megaImage: String
-    similarArtists: SimilarArtists
+    similarArtists: [LastFMSimilarArtist]
     url: String
-    tags: LastFMTags
+    topTags: [LastFMTag]
     biography: Biography
-  }
-
-  type SimilarArtists {
-    similarArtists: [SimilarArtist]
   }
 
   type Biography {
     summaryHTML: String
-  }
-
-  type LastFMTags {
-    tags: [LastFMTag]
   }
 
   type LastFMTag {
@@ -38,7 +30,7 @@ module.exports = buildSchema(`
     url: String
   }
 
-  type SimilarArtist {
+  type LastFMSimilarArtist {
     mbid: String
     name: String!
     image: String
@@ -71,39 +63,26 @@ module.exports = buildSchema(`
     gender: String
     genderID: String
     lifeSpan: LifeSpan
-    tags: Tags
+    tags: [Tag]
     aliases: [Alias]
-    area: ArtistArea
-    beginArea: ArtistArea
-    endArea: ArtistArea
+    area: NestedArea
+    beginArea: NestedArea
+    endArea: NestedArea
     slug: String!
-    relationships: AllRelationships
+    relationships: Relationships
     lastUpdated: String!
     lastFM: LastFM
   }
 
-  type AllRelationships {
-    artists: Relationships
-    areas: Relationships
-    events: Relationships
-    instruments: Relationships
-    labels: Relationships
-    places: Relationships
-    recordings: Relationships
-    releases: Relationships
-    releaseGroups: Relationships
-    series: Relationships
-    works: Relationships
-    urls: Relationships
+  type Relationships {
+    artists: ArtistRelationships
   }
 
-  type Relationships {
-    nodes: [Relationship]
+  type ArtistRelationships {
+    teacher: Relationship
   }
 
   type Relationship {
-    type: String
-    targetType: String
     direction: String
     begin: String
     end: String
@@ -117,48 +96,19 @@ module.exports = buildSchema(`
   type RelationTarget {
     mbid: String
     name: String
-    title: String
-    resource: String
   }
 
-  type ArtistArea {
+  type NestedArea {
     mbid: String
     name: String
     sortName: String
     disambiguation: String
-    partOfArea: PartOfArea
-  }
-
-  type PartOfArea {
-    areas: PartOfAreaAreas
-    placeholder: PlaceholderNodes
-  }
-
-  type PlaceholderNodes{
-    nodes: [String]
-  }
-
-  type PartOfAreaAreas {
-    nodes: [PartOfAreaAreasNodes]
-  }
-
-  type PartOfAreaAreasNodes {
-    target: Target
-  }
-
-  type Target {
-    mbid: String
-    name: String
-    partOfArea: PartOfArea
+    area: NestedArea
   }
 
   type Rating {
     voteCount: Int
     value: Float
-  }
-
-  type Tags {
-    tags: [Tag]
   }
 
   type Tag {
@@ -180,11 +130,6 @@ module.exports = buildSchema(`
     country: String
   }
 
-  type ArtistImage {
-    url: String
-    size: String
-  }
-
   type ReleaseGroup {
     _id: ID!
     id: String!
@@ -203,23 +148,6 @@ module.exports = buildSchema(`
     status: String
   }
 
-  input LifeSpanInput {
-    begin: String
-    end: String
-    ended: Boolean
-  }
-
-  input AreaInput {
-    id: String!
-    name: String!
-    disambiguation: String
-    type: String!
-    typeId: String!
-    sortName: String!
-    aliases: [String!]
-    lifeSpan: LifeSpanInput
-  }
-
   type Query {
     getAreas(limit: Int, offset: Int) : [Area]
     getArea(id: String!) : Area
@@ -229,12 +157,10 @@ module.exports = buildSchema(`
     getArtists(limit: Int, offset: Int) : [Artist]
     getReleases(limit: Int, offset: Int) : [Release]
     getReleaseGroups(limit: Int, offset: Int) : [ReleaseGroup]
+    target: RelationTarget
   }
 
   type Mutation {
-    createArea(area: AreaInput!): Area
-    updateArea(area: AreaInput!): Area
-    deleteArea(id: Int!): Boolean
     saveArtist(data: String): Artist
   }
   `);
